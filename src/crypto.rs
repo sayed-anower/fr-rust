@@ -94,13 +94,20 @@ pub async fn hash_data(data: &str) -> Result<HashedData> {
     Ok(HashedData { hash })
 }
 
+
 pub async fn verify_hash(data: &str, hash: &str) -> Result<bool> {
-    let parsed = PasswordHash::new(hash)?;
+    let data = data.to_owned();
+    let hash = hash.to_owned();
 
     let ok = task::spawn_blocking(move || {
-        Argon2::default()
-            .verify_password(data.as_bytes(), &parsed)
-            .is_ok()
+        match PasswordHash::new(&hash) {
+            Ok(parsed) => {
+                Argon2::default()
+                    .verify_password(data.as_bytes(), &parsed)
+                    .is_ok()
+            }
+            Err(_) => false,
+        }
     })
     .await?;
 
