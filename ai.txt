@@ -1,0 +1,263 @@
+use fr_rust::prelude::*;
+// App config
+pub fn app_config(cfg: &mut ServiceConfig) {
+  cfg.service(index_file);
+}
+// Use macros for clean look.
+#[get("/")]
+async fn index_file() -> FileRlt {
+    // Send the file
+    send_file("index.html").await
+}
+#[fr_rust::main]
+async fn main() -> MainRlt {
+  // Initialized env
+  init_env();
+  // It takes env_var(variable_name, default)
+  let ip = env_var("IP", "127.0.0.1");
+  let port = env_var("PORT", "8080");
+  let address = format!("{}:{}", ip, port);
+  // run the server
+  let _ = run_server(app_config, &address)?.await;
+  Ok(())
+}
+// Send email
+fn main() {
+  let config = EmailConfig {
+    smtp_host: "smtp.example.com",
+    smtp_port: 587,
+    smtp_user: "user@example.com",
+    smtp_pass: "password",
+    from_name: "John Doe",
+    from_email: "john@example.com"
+  };
+  let data = EmailData {
+    to: "receiver@example.com",
+    subject: "Hello!",
+    body: "This is the mail body".to_string(),
+  };
+  send_email(config, data)?;
+}
+// Otp Handle
+fn main() {
+  let secs = 60;
+  let digit = 6; // 6 digit otp
+  let opt_service = OtpService::new("your_secret_key", secs);
+  let user_id = "user123";
+  let otp = otp_service.generate_otp(user_id, digit);
+  if otp_service.verify_otp(user_id, otp) {
+    println!("Valid otp!");
+  } else {
+    println!("Invalid otp!");
+  }
+}
+// Crypto Handle
+#[tokio::main]
+async fn main() -> Rlt {
+    // 32-byte AES key
+    let key = b"12345678901234567890123456789012"; // must be 32-byte
+    let config = CryptoConfig {
+        encryption_key: &key,
+    };
+    // ENCRYPT
+    let original_text = "Hello AES-256-GCM + Argon2 world!";
+    let encrypted = encrypt_text(&config, original_text).await?;
+    println!("🔒 Encrypted:\n{}\n", encrypted.encrypted_text);
+    // DECRYPT
+    let decrypted = decrypt_text(&config, &encrypted.encrypted_text).await?;
+    println!("🔓 Decrypted:\n{}\n", decrypted.text);
+    // HASH
+    let password = "super_secret_password";
+    let hashed = hash_data(password).await?;
+    println!("Hashed:\n{}\n", hashed.hash);
+    // VERIFY
+    let verify_ok = verify_hash(password, &hashed.hash).await?;
+    println!("✅ Verify password: {}", verify_ok);
+    let verify_fail = verify_hash("wrong_password", &hashed.hash).await?;
+
+    Ok(())
+}
+// Handle DB:
+async fn some_fn() -> anyhow::Result<()> {
+    let database_url = "postgresql://us:some@localhost:5432/my_db";
+    let pool = create_db_pool(database_url);
+    db_execute(&pool, "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT, age INT);", &[]).await?;
+    // db_query_one()
+    let insert_query = "INSERT INTO users (name, age) VALUES ($1, $2);";
+    let rows_affected = db_execute(&pool, insert_query, &[&"Alice", &30]).await?;
+    println!("Rows inserted: {}\n", rows_affected);
+    // db_query()
+    let select_all_query = "SELECT id, name, age FROM users;";
+    let rows = db_query(&pool, select_all_query, &[]).await?;
+    for row in rows {
+        let id: i32 = row.get("id");
+        let name: String = row.get("name");
+        let age: i32 = row.get("age");
+        println!("User found -> ID: {}, Name: {}, Age: {}", id, name, age);
+    }
+    println!();
+    // db_query_one()
+    let select_one_query = "SELECT name FROM users WHERE id = $1;";
+    let row = db_query_one(&pool, select_one_query, &[&1]).await?;
+    let name: String = row.get("name");
+    println!("Exactly one user found: {}\n", name);
+    // db_query_opt()
+    println!("--- Testing db_query_opt() ---");
+    let select_opt_query = "SELECT name FROM users WHERE id = $1;";
+    let maybe_row = db_query_opt(&pool, select_opt_query, &[&999]).await?;
+    match maybe_row {
+        Some(row) => {
+            let name: String = row.get("name");
+            println!("User 999 exists: {}", name);
+        }
+        None => println!("User 999 does not exist (Safe fallback!)."),
+    }
+    Ok(())
+}
+// Web Socket Handling:
+pub fn app_config(cfg: &mut ServiceConfig) {
+  cfg
+  // Implemented web socket
+  .configure(impl_ws)
+  .service(ws)
+  .service(message_group);
+}
+// The WebSocket Route
+#[get("/ws/{user_id}")]
+async fn ws(
+    req: Rqs,
+    body: Payload,
+    manager: AppData<WsManager>,
+    path: Path<String>
+) -> RltRsp {
+    let user_id = path.into_inner();
+    let (response, session, mut msg_stream) = actix_ws::handle(&req, body)?;
+    // Handles the sending logic.
+    let guard = manager.register(&user_id, session);
+rt::spawn(async move {
+// Move the guard into the task so it lives as long as the connection
+let _keep_alive = guard;
+while let Some(Ok(msg)) = msg_stream.next().await {
+match msg {
+Message::Text(text) => {
+println!("{user_id}: {text}");
+}
+Message::Close(_) => {
+//  Dropping `_keep_alive` removes the user.
+break;
+}
+_ => {}
+}
+}
+});
+Ok(response)
+}
+// Sending to Users by id
+#[get("/msg")]
+async fn message_group(manager: AppData<WsManager>) -> Rsp {
+    let target_users = vec!["user123", "user456", "admin99"];
+    // send to multiple users
+    manager.send_to_users(
+        &target_users,
+        AppMessage::Notification {
+            title: "Group Update".to_string(), 
+            body: "Meeting starts in 5 minutes".to_string() 
+        }
+    );
+    // send to one User
+    manager.send_to_user(
+    "user123",
+    AppMessage::DirectMessage{
+        from: "user123".to_string(),
+        content: "Hi!".to_string(),
+    }
+    );
+    // Broadcast / Send to every connected users
+    manager.broadcast(AppMessage::SystemAlert("System alert!".to_string()));
+    http_ok("Ok!")
+}
+// Another functions:
+// Http Ok, send string body
+async fn some_fn() -> Rsp {
+  http_ok("Ok!")
+}
+// Http Bad, send string body
+async fn some_fn() -> Rsp {
+  http_bad("Error!")
+}
+// Http Ok, send json body
+async fn some_fn() -> Rsp {
+  http_ok_json(json_data)
+}
+// Http Bad, send json body
+async fn some_fn() -> Rsp {
+  http_bad_json(json_data)
+}
+// Send file, also capable to send large file in streaming.
+async fn some_fn() -> FileRlt {
+  send_file("./file/path/").await
+}
+// Send string body
+async fn some_fn() -> Rsp {
+  send_str("Hello!")
+}
+//JSON sending ways:
+// Way 1
+#[derive(Serialize)]
+struct User {
+    id: u32,
+    name: String,
+}
+// Send json body
+async fn user() -> Rsp {
+    let data = User {
+        id: 1,
+        name: "Sayed".to_string(),
+    };
+    send_json(data)
+}
+// Way 2
+send_json(vec![1, 2, 3])
+// Way 3
+let json = json!({
+    "success": true,
+    "message": "Logged in"
+};
+http_bad_json(json)
+// Way 4
+let mut map = HashMap::new();
+map.insert("name", "Sayed");
+http_ok_json(map)
+// These are defined also, you can use:
+Rlt = Result<()>;
+Rsp = HttpResponse;
+RltRsp = Result<HttpResponse, Error>;
+Rqs = HttpRequest;
+MainRlt = Result<(), std::io::Error>;	
+FileRlt = Result<NamedFile, Error>;
+// lib.rs:
+// All of others, that used before available in prelude with these.
+pub use actix_web;
+pub use actix_ws;
+pub use aes_gcm;
+pub use anyhow;
+pub use argon2;
+pub use base64;
+pub use dashmap;
+pub use deadpool_postgres;
+pub use dotenvy;
+pub use futures_util;
+pub use hmac;
+pub use lettre;
+pub use rand;
+pub use serde;
+pub use sha2;
+pub use tokio;
+pub use tokio_postgres;
+pub use uuid;
+pub use actix_web::{
+HttpRequest, Responder, delete, get, patch, post, put, rt,
+web::{Data as AppData, Form, Json, Path, Payload, Query, ServiceConfig},
+};
+pub use serde::{Deserialize, Serialize};
+pub use std::{collections::HashMap, env, io::Result};

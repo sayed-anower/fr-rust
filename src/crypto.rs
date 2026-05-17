@@ -2,19 +2,21 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
     aead::{Aead, KeyInit},
 };
-use argon2::password_hash::Error as PasswordError;
 use anyhow::{Result, anyhow};
 use argon2::{
     Argon2,
-    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
+    password_hash::{
+        PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
+        rand_core::OsRng,
+    },
 };
 use base64::{Engine as _, engine::general_purpose};
 use rand::RngCore;
 use tokio::task;
 
-// Config struct to replace Env Vars
+// CONFIG
 pub struct CryptoConfig<'a> {
-    pub encryption_key: &'a [u8; 32], // 32 bytes for AES-256
+    pub encryption_key: &'a [u8; 32],
 }
 
 // ENCRYPTION
@@ -25,26 +27,23 @@ pub struct EncryptedData {
 pub async fn encrypt_text(config: &CryptoConfig<'_>, text: &str) -> Result<EncryptedData> {
     let cipher = Aes256Gcm::new_from_slice(config.encryption_key)?;
 
-    // 96-bit nonce
     let mut nonce_bytes = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    let encrypted = cipher
+    let ciphertext = cipher
         .encrypt(nonce, text.as_bytes())
         .map_err(|_| anyhow!("Encryption failed"))?;
 
-    // Combine nonce + ciphertext
-    let mut combined = Vec::with_capacity(nonce_bytes.len() + encrypted.len());
+    let mut combined = Vec::new();
     combined.extend_from_slice(&nonce_bytes);
-    combined.extend_from_slice(&encrypted);
+    combined.extend_from_slice(&ciphertext);
 
     Ok(EncryptedData {
         encrypted_text: general_purpose::STANDARD.encode(combined),
     })
 }
 
-// DECRYPTION
 pub struct DecryptedData {
     pub text: String,
 }
@@ -64,12 +63,12 @@ pub async fn decrypt_text(
     let (nonce_bytes, ciphertext) = decoded.split_at(12);
     let nonce = Nonce::from_slice(nonce_bytes);
 
-    let decrypted = cipher
+    let plaintext = cipher
         .decrypt(nonce, ciphertext)
         .map_err(|_| anyhow!("Decryption failed"))?;
 
     Ok(DecryptedData {
-        text: String::from_utf8(decrypted)?,
+        text: String::from_utf8(plaintext)?,
     })
 }
 
@@ -79,11 +78,12 @@ pub struct HashedData {
 }
 
 pub async fn hash_data(data: &str) -> Result<HashedData> {
-    let data = data.to_string(); // Move to heap for the blocking task
+    let data = data.to_string();
 
     let hash = task::spawn_blocking(move || {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
+
         argon2
             .hash_password(data.as_bytes(), &salt)
             .map(|h| h.to_string())
@@ -94,8 +94,15 @@ pub async fn hash_data(data: &str) -> Result<HashedData> {
     Ok(HashedData { hash })
 }
 
-pub async fn verify_hash(data: &str, hash: &str) -> Result<bool, PasswordError> {
-    let parsed_hash = PasswordHash::new(hash)?;
-    let result = Argon2::default().verify_password(data.as_bytes(), &parsed_hash);
-    Ok(result.is_ok())
+pub async fn verify_hash(data: &str, hash: &str) -> Result<bool> {
+    let parsed = PasswordHash::new(hash)?;
+
+    let ok = task::spawn_blocking(move || {
+        Argon2::default()
+            .verify_password(data.as_bytes(), &parsed)
+            .is_ok()
+    })
+    .await?;
+
+    Ok(ok)
 }

@@ -2,7 +2,7 @@ use actix_web::{Error, HttpRequest, HttpResponse};
 use actix_files::NamedFile;
 
 // A clean shorthand actix result
-pub type Rlt = actix_web::Result<()>;
+pub type Rlt = Result<()>;
 // A clean shorthand response
 pub type Rsp = HttpResponse;
 // A clean shorthand for a standard Actix Result
