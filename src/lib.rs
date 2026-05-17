@@ -74,7 +74,7 @@ pub mod prelude {
 
     pub use crate::crypto;
 
-    pub use crate::crypto::{CryptoConfig, decrypt_text, encrypt_text, hash_text, verify_hash};
+    pub use crate::crypto::{CryptoConfig, decrypt_text, encrypt_text, hash_data, verify_hash};
 
     // =========================
     // OTP
@@ -98,7 +98,7 @@ pub mod prelude {
 
     pub use crate::db;
 
-    pub use crate::db::{DbPool, create_pool, execute, query, query_one, query_opt};
+    pub use crate::db::{DbPool, create_db_pool, db_execute, db_query, db_query_one, db_query_opt};
 
     // =========================
     // Routes

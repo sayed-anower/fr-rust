@@ -1,5 +1,5 @@
 use actix_files::NamedFile;
-use actix_web::{HttpResponse, Responder, ResponseError, Result};
+use actix_web::{Responder, ResponseError, HttpRequest, HttpResponse};
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -14,21 +14,21 @@ pub fn send_json<T: Serialize>(data: &T) -> impl Responder {
 }
 
 // Sends a file from a path
-pub fn send_file(path: &str) -> impl Responder {
+pub fn send_file(req: HttpRequest, path: &str) -> impl Responder {
     match NamedFile::open(PathBuf::from(path)) {
-        Ok(file) => file.into_response(),
+        Ok(file) => file.into_response(&req),
         Err(_) => HttpResponse::NotFound().body("File not found"),
     }
 }
 
 /// 200 OK
-pub fn http_ok(msg: &str) -> impl Responder {
-    HttpResponse::Ok().body(msg.into())
+pub fn http_ok(msg: String) -> impl Responder {
+    HttpResponse::Ok().body(msg)
 }
 
 /// 400 Bad Request
-pub fn http_bad(msg: &str) -> impl Responder {
-    HttpResponse::BadRequest().body(msg.into())
+pub fn http_bad(msg: String) -> impl Responder {
+    HttpResponse::BadRequest().body(msg)
 }
 
 // 200 OK response with json

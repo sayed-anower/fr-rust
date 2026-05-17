@@ -1,5 +1,5 @@
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod, Runtime};
-use std::{env, sync::Arc};
+use std::{sync::Arc};
 use tokio_postgres::{Config, NoTls, Row, types::ToSql};
 
 pub type DbPool = Arc<Pool>;
@@ -53,11 +53,11 @@ pub async fn db_query_opt(
     pool: &DbPool,
     query: &str,
     params: &[&(dyn ToSql + Sync)],
-) -> Result<Row, tokio_postgres::Error> {
+) -> Result<Option<Row>, tokio_postgres::Error> { // <- Changed return type
     let client = pool.get().await.unwrap();
 
-    let row = client.query_opt(query, params).await?;
-    Ok(row)
+    let row_opt = client.query_opt(query, params).await?;
+    Ok(row_opt)
 }
 
 // Get MANY rows
@@ -69,5 +69,5 @@ pub async fn db_query(
     let client = pool.get().await.unwrap();
 
     let rows = client.query(query, params).await?;
-    Ok(row)
+    Ok(rows)
 }

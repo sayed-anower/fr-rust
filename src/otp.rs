@@ -2,7 +2,7 @@ use hmac::{Hmac, Mac};
 use rand::{RngCore, rngs::OsRng};
 use sha2::Sha256;
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -68,7 +68,7 @@ impl OtpService {
 
     // Helpers
     fn random_digits(digits: u32) -> String {
-        let mut num = 0u64;
+        let num = 0u64;
         OsRng.fill_bytes(&mut num.to_le_bytes());
 
         let otp = num % 10u64.pow(digits);

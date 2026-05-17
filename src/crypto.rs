@@ -2,6 +2,7 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
     aead::{Aead, KeyInit},
 };
+use argon2::password_hash::Error as PasswordError;
 use anyhow::{Result, anyhow};
 use argon2::{
     Argon2,
@@ -93,7 +94,7 @@ pub async fn hash_data(data: &str) -> Result<HashedData> {
     Ok(HashedData { hash })
 }
 
-pub async fn verify_hash(data: &str, hash: &str) -> Result<bool> {
+pub async fn verify_hash(data: &str, hash: &str) -> Result<bool, PasswordError> {
     let parsed_hash = PasswordHash::new(hash)?;
     let result = Argon2::default().verify_password(data.as_bytes(), &parsed_hash);
     Ok(result.is_ok())

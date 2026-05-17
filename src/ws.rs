@@ -1,3 +1,5 @@
+use actix_web::web::ServiceConfig;
+use actix_web::web::Data as AppData;
 use actix_ws::Session;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -116,6 +118,6 @@ impl Drop for SessionGuard {
 pub fn impl_ws(cfg: &mut ServiceConfig) {
     // Initialize the manager
     let ws_manager = WsManager::new();
-    let app_data = web::Data::new(ws_manager.clone());
+    let _app_data = AppData::new(ws_manager.clone());
     cfg.app_data(ws_manager);
 }
