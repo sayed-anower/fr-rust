@@ -1,31 +1,18 @@
-use deadpool_postgres::{
-    Manager, ManagerConfig, Pool, RecyclingMethod, Runtime,
-};
+use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use std::{env, sync::Arc};
-use tokio_postgres::{
-    types::ToSql,
-    Config, NoTls, Row,
-};
+use tokio_postgres::{Config, NoTls, Row, types::ToSql};
 
 pub type DbPool = Arc<Pool>;
 
 // Create PostgreSQL connection pool
 pub fn create_db_pool(database_url: &str) -> DbPool {
-
-
-    let config: Config = database_url
-        .parse()
-        .expect("Invalid DATABASE_URL");
+    let config: Config = database_url.parse().expect("Invalid DATABASE_URL");
 
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
     };
 
-    let manager = Manager::from_config(
-        config,
-        NoTls,
-        mgr_config,
-    );
+    let manager = Manager::from_config(config, NoTls, mgr_config);
 
     // Optimized pool
     let pool = Pool::builder(manager)
@@ -54,12 +41,12 @@ pub async fn db_query_one(
     pool: &DbPool,
     query: &str,
     params: &[&(dyn ToSql + Sync)],
-) -> Result<Row, Box<dyn std::error::Error>> { // Handles both pool and query errors
-    let client = pool.get().await?; 
+) -> Result<Row, Box<dyn std::error::Error>> {
+    // Handles both pool and query errors
+    let client = pool.get().await?;
     let row = client.query_one(query, params).await?;
     Ok(row)
 }
-
 
 // Get ONE row or none
 pub async fn db_query_opt(
@@ -84,6 +71,3 @@ pub async fn db_query(
     let rows = client.query(query, params).await?;
     Ok(row)
 }
-
-
-

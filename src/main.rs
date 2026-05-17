@@ -1,5 +1,5 @@
 use fr_rust::prelude::*;
 
 fn main() {
-  println!("Hello, World!");
+    println!("Hello, World!");
 }

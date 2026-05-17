@@ -34,7 +34,10 @@ impl WsManager {
         let (tx, mut rx) = mpsc::channel::<AppMessage>(100);
 
         // Add to state
-        let user_sessions = self.connections.entry(user_id.to_string()).or_insert_with(DashMap::new);
+        let user_sessions = self
+            .connections
+            .entry(user_id.to_string())
+            .or_insert_with(DashMap::new);
         user_sessions.insert(session_id, tx);
 
         // Spawn a dedicated write task for this session
@@ -90,7 +93,7 @@ impl WsManager {
             user_sessions.remove(&session_id);
             // If user has no more active sessions, remove the user entirely to free memory
             if user_sessions.is_empty() {
-                drop(user_sessions); 
+                drop(user_sessions);
                 self.connections.remove(user_id);
             }
         }
@@ -116,5 +119,3 @@ pub fn impl_ws(cfg: &mut ServiceConfig) {
     let app_data = web::Data::new(ws_manager.clone());
     cfg.app_data(ws_manager);
 }
-
-

@@ -1,7 +1,6 @@
 use lettre::{
-    message::Mailbox,
+    Message, SmtpTransport, Transport, message::Mailbox,
     transport::smtp::authentication::Credentials,
-    Message, SmtpTransport, Transport,
 };
 use std::error::Error;
 

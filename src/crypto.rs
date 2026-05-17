@@ -1,13 +1,13 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use rand::RngCore;
 use tokio::task;
 
@@ -48,7 +48,10 @@ pub struct DecryptedData {
     pub text: String,
 }
 
-pub async fn decrypt_text(config: &CryptoConfig<'_>, encrypted_text: &str) -> Result<DecryptedData> {
+pub async fn decrypt_text(
+    config: &CryptoConfig<'_>,
+    encrypted_text: &str,
+) -> Result<DecryptedData> {
     let cipher = Aes256Gcm::new_from_slice(config.encryption_key)?;
 
     let decoded = general_purpose::STANDARD.decode(encrypted_text)?;

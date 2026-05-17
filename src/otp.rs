@@ -1,8 +1,8 @@
-use rand::{RngCore, rngs::OsRng};
 use hmac::{Hmac, Mac};
+use rand::{RngCore, rngs::OsRng};
 use sha2::Sha256;
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -36,10 +36,7 @@ impl OtpService {
         let hash = Self::hmac_hash(&self.secret, &otp);
 
         let mut store = self.store.lock().unwrap();
-        store.insert(
-            user_id.to_string(),
-            OtpRecord { hash, expires_at },
-        );
+        store.insert(user_id.to_string(), OtpRecord { hash, expires_at });
 
         otp
     }
@@ -80,8 +77,8 @@ impl OtpService {
     }
 
     fn hmac_hash(secret: &str, data: &str) -> String {
-        let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
-            .expect("HMAC can take key of any size");
+        let mut mac =
+            HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
 
         mac.update(data.as_bytes());
 

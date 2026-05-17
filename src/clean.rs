@@ -1,8 +1,4 @@
-use actix_web::{
-  HttpResponse,
-  Error,
-  HttpRequest
-};
+use actix_web::{Error, HttpRequest, HttpResponse};
 // A clean shorthand actix result
 type Rlt = actix_web::Result<()>;
 // A clean shorthand response

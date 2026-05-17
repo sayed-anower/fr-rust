@@ -1,15 +1,15 @@
 // These all are available to prelude already, just simply use.
 // Feels easy
-pub mod server;
-pub mod crypto;
-pub mod otp;
-pub mod email;
-pub mod db;
-pub mod routes;
-pub mod config;
-pub mod ws;
-pub mod res;
 pub mod clean;
+pub mod config;
+pub mod crypto;
+pub mod db;
+pub mod email;
+pub mod otp;
+pub mod res;
+pub mod routes;
+pub mod server;
+pub mod ws;
 
 // Alias
 pub use clean as cl;
@@ -23,77 +23,50 @@ pub mod prelude {
 
     pub use actix_web;
     pub use actix_ws;
-    pub use futures_util;
-    pub use dashmap;
-    pub use rand;
-    pub use tokio;
-    pub use dotenvy;
-    pub use serde;
-    pub use uuid;
-    pub use argon2;
-    pub use anyhow;
     pub use aes_gcm;
+    pub use anyhow;
+    pub use argon2;
     pub use base64;
-    pub use tokio_postgres;
+    pub use dashmap;
     pub use deadpool_postgres;
-    pub use lettre;
+    pub use dotenvy;
+    pub use futures_util;
     pub use hmac;
+    pub use lettre;
+    pub use rand;
+    pub use serde;
     pub use sha2;
+    pub use tokio;
+    pub use tokio_postgres;
+    pub use uuid;
 
     // =========================
     // Actix Web
     // =========================
 
     pub use actix_web::{
-        delete,
-        get,
-        patch,
-        post,
-        put,
-        main,
-        rt,
-        HttpRequest,
-        Responder,
-        web::{
-            Json,
-            Form,
-            Query,
-            Path,
-            Data as AppData,
-            ServiceConfig,
-            Payload,
-        },
+        HttpRequest, Responder, delete, get, main, patch, post, put, rt,
+        web::{Data as AppData, Form, Json, Path, Payload, Query, ServiceConfig},
     };
 
     // =========================
     // Serde
     // =========================
 
-    pub use serde::{
-        Serialize,
-        Deserialize,
-    };
+    pub use serde::{Deserialize, Serialize};
 
     // =========================
     // STD
     // =========================
 
-    pub use std::{
-        env,
-        collections::HashMap,
-        io::Result,
-    };
+    pub use std::{collections::HashMap, env, io::Result};
 
     // =========================
     // Server
     // =========================
 
     pub use crate::server;
-    pub use crate::server::{
-        run_server,
-        init_env,
-        env_var,
-    };
+    pub use crate::server::{env_var, init_env, run_server};
 
     // =========================
     // Crypto
@@ -101,13 +74,7 @@ pub mod prelude {
 
     pub use crate::crypto;
 
-    pub use crate::crypto::{
-        CryptoConfig,
-        hash_text,
-        encrypt_text,
-        decrypt_text,
-        verify_hash,
-    };
+    pub use crate::crypto::{CryptoConfig, decrypt_text, encrypt_text, hash_text, verify_hash};
 
     // =========================
     // OTP
@@ -115,9 +82,7 @@ pub mod prelude {
 
     pub use crate::otp;
 
-    pub use crate::otp::{
-        OtpService,
-    };
+    pub use crate::otp::OtpService;
 
     // =========================
     // Email
@@ -125,11 +90,7 @@ pub mod prelude {
 
     pub use crate::email;
 
-    pub use crate::email::{
-        EmailData,
-        EmailConfig,
-        send_email,
-    };
+    pub use crate::email::{EmailConfig, EmailData, send_email};
 
     // =========================
     // DB
@@ -137,14 +98,7 @@ pub mod prelude {
 
     pub use crate::db;
 
-    pub use crate::db::{
-        query,
-        query_one,
-        query_opt,
-        execute,
-        create_pool,
-        DbPool,
-    };
+    pub use crate::db::{DbPool, create_pool, execute, query, query_one, query_opt};
 
     // =========================
     // Routes
@@ -164,11 +118,7 @@ pub mod prelude {
 
     pub use crate::ws;
 
-    pub use crate::ws::{
-        impl_ws,
-        WsManager,
-        AppMessage,
-    };
+    pub use crate::ws::{AppMessage, WsManager, impl_ws};
 
     // =========================
     // Responses
@@ -177,13 +127,7 @@ pub mod prelude {
     pub use crate::res;
 
     pub use crate::res::{
-        send_str,
-        send_json,
-        send_file,
-        http_ok,
-        http_bad,
-        http_ok_json,
-        http_bad_json,
+        http_bad, http_bad_json, http_ok, http_ok_json, send_file, send_json, send_str,
     };
 
     // =========================
@@ -192,9 +136,5 @@ pub mod prelude {
 
     pub use crate::clean as cl;
 
-    pub use crate::cl::{
-        Rsp,
-        Rlt,
-        RltRsp,
-    };
+    pub use crate::cl::{Rlt, RltRsp, Rsp};
 }
