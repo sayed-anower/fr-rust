@@ -1,4 +1,5 @@
 use hmac::{Hmac, Mac};
+use base64::{engine::general_purpose, Engine as _};
 use rand::{RngCore, rngs::OsRng};
 use sha2::Sha256;
 use std::collections::HashMap;
@@ -83,7 +84,7 @@ impl OtpService {
         mac.update(data.as_bytes());
 
         let result = mac.finalize().into_bytes();
-        base64::encode(result)
+        general_purpose::STANDARD.encode(result)
     }
 
     fn now() -> u64 {
