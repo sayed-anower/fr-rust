@@ -1,0 +1,37 @@
+[package]
+name = "fr-rust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Web and WebSocket
+actix-web = "4.9"
+actix-ws = "0.3"
+
+# Async and Utilities
+tokio = { version = "1.40", features = ["full"] }
+futures-util = "0.3"
+dashmap = "6.1"
+anyhow = "1.0"
+uuid = { version = "1.10", features = ["v4", "serde"] }
+dotenvy = "0.15"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+
+# Database
+tokio-postgres = "0.7"
+deadpool-postgres = "0.14"
+
+# Security and Hashing
+argon2 = "0.5"
+aes-gcm = "0.10"
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+
+# Randomness
+rand = "0.8"
+
+# Email
+lettre = { version = "0.11", features = ["tokio-rustls-tls"] }
