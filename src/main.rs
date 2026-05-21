@@ -22,9 +22,9 @@ async fn test_email() -> Rsp {
         smtp_host: env_var("SMTP_HOST","smtp.ex.io"),
         smtp_port: env_var("SMTP_PORT", "000").parse().expect("SMTP_PORT must be a valid integer"),
         smtp_user: env_var("SMTP_USER", "u@ex.io"),
-        smtp_pass: ("SMTP_PASS", "pwd"),
+        smtp_pass: env_var("SMTP_PASS", "pwd"),
         from_name: env_var("FROM_NAME", "Unknown"),
-        from_email: ("FROM_EMAIL", "ex@ex.com"),
+        from_email: env_var("FROM_EMAIL", "ex@ex.com"),
     };
     let data = EmailData {
         to: "bluekite1234@gmail.com",

@@ -122,7 +122,7 @@ pub mod prelude {
 
     pub use crate::ws;
 
-    pub use crate::ws::{AppMessage, WsManager, impl_ws};
+    pub use crate::ws::{AppMessage, WsManager};
 
     // =========================
     // Responses
