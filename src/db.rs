@@ -5,7 +5,7 @@ use tokio_postgres::{Config, NoTls, Row, types::ToSql};
 pub type DbPool = Arc<Pool>;
 
 // Create PostgreSQL connection pool
-pub fn create_db_pool(database_url: &str) -> DbPool {
+pub fn create_db_pool(database_url: String) -> DbPool {
     let config: Config = database_url.parse().expect("Invalid DATABASE_URL");
 
     let mgr_config = ManagerConfig {

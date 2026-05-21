@@ -4,13 +4,13 @@ use lettre::{
 };
 use std::error::Error;
 
-pub struct EmailConfig<'a> {
-    pub smtp_host: &'a str,
+pub struct EmailConfig {
+    pub smtp_host: String,
     pub smtp_port: u16,
-    pub smtp_user: &'a str,
-    pub smtp_pass: &'a str,
-    pub from_name: &'a str,
-    pub from_email: &'a str,
+    pub smtp_user: String,
+    pub smtp_pass: String,
+    pub from_name: String,
+    pub from_email: String,
 }
 
 pub struct EmailData<'a> {
@@ -34,7 +34,7 @@ pub fn send_email(config: EmailConfig, data: EmailData) -> Result<(), Box<dyn Er
     let creds = Credentials::new(config.smtp_user.to_string(), config.smtp_pass.to_string());
 
     // SMTP client - Relay is built using the provided host and port
-    let mailer = SmtpTransport::starttls_relay(config.smtp_host)?
+    let mailer = SmtpTransport::starttls_relay(&config.smtp_host)?
         .port(config.smtp_port)
         .credentials(creds)
         .build();

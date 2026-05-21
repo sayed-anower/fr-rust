@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
+use std::collections::HashMap; // Added missing import for your JSON map test
+use fr_rust::prelude::*;
 
 // 1. Define your Enum for multiple message types
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -67,7 +69,6 @@ impl WsManager {
     pub fn send_to_user(&self, user_id: &str, msg: AppMessage) {
         if let Some(user_sessions) = self.connections.get(user_id) {
             for session in user_sessions.iter() {
-                // try_send is non-blocking and highly performant
                 let _ = session.value().try_send(msg.clone());
             }
         }
@@ -113,11 +114,4 @@ impl Drop for SessionGuard {
     fn drop(&mut self) {
         self.manager.remove_session(&self.user_id, self.session_id);
     }
-}
-
-pub fn impl_ws(cfg: &mut ServiceConfig) {
-    // Initialize the manager
-    let ws_manager = WsManager::new();
-    let _app_data = AppData::new(ws_manager.clone());
-    cfg.app_data(ws_manager);
 }

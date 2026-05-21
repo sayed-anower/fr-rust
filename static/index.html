@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>fr_rust Feature Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 20px;
+        }
+
+        h1 { margin: 0 0 10px 0; color: #fff; }
+        p { margin: 0; color: var(--text-muted); }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        button:hover { background-color: var(--accent-hover); }
+        button.secondary { background-color: #475569; }
+        button.secondary:hover { background-color: #334155; }
+        button.danger { background-color: var(--danger); }
+
+        input {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            width: calc(100% - 18px);
+        }
+
+        .output {
+            background-color: #090d16;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 150px;
+            overflow-y: auto;
+            color: #38bdf8;
+            margin-top: auto;
+            border: 1px solid #1e293b;
+        }
+
+        .status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--danger);
+            margin-right: 5px;
+        }
+        .status.connected { background-color: var(--success); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>FR-RUST Backend Testing Panel</h1>
+        <p>Interactive dashboard to trigger and monitor all library features</p>
+    </header>
+
+    <div class="grid">
+        <!-- Core Utilities -->
+        <div class="card">
+            <h2>Email Operations</h2>
+            <p style="font-size: 0.9rem; margin-bottom: 15px;">Triggers SMTP setup and mock email sending.</p>
+            <div class="btn-group">
+                <button onclick="runTest('/test/email', 'email-out')">Send Test Email</button>
+            </div>
+            <div class="output" id="email-out">Awaiting execution...</div>
+        </div>
+
+        <div class="card">
+            <h2>OTP Handle</h2>
+            <p style="font-size: 0.9rem; margin-bottom: 15px;">Generates and instantly verifies a 6-digit secure token.</p>
+            <div class="btn-group">
+                <button onclick="runTest('/test/otp', 'otp-out')">Verify Mock OTP</button>
+            </div>
+            <div class="output" id="otp-out">Awaiting execution...</div>
+        </div>
+
+        <div class="card">
+            <h2>Crypto & Hashing</h2>
+            <p style="font-size: 0.9rem; margin-bottom: 15px;">Tests AES-GCM encryption/decryption & Argon2 hashing.</p>
+            <div class="btn-group">
+                <button onclick="runTest('/test/crypto', 'crypto-out')">Run Crypto Cycle</button>
+            </div>
+            <div class="output" id="crypto-out">Awaiting execution...</div>
+        </div>
+
+        <div class="card">
+            <h2>Database Handle</h2>
+            <p style="font-size: 0.9rem; margin-bottom: 15px;">Executes table setups, data inserts, and unique row fetches.</p>
+            <div class="btn-group">
+                <button onclick="runTest('/test/db', 'db-out')">Test Postgres Pool</button>
+            </div>
+            <div class="output" id="db-out">Awaiting execution...</div>
+        </div>
+
+        <!-- HTTP Responses Layouts -->
+        <div class="card" style="grid-column: span 1;">
+            <h2>HTTP Core Responses</h2>
+            <p style="font-size: 0.9rem; margin-bottom: 15px;">Tests variations of custom response helper wrappers.</p>
+            <div class="btn-group">
+                <button class="secondary" onclick="runTest('/test/responses/ok', 'resp-out')">http_ok</button>
+                <button class="secondary" onclick="runTest('/test/responses/bad', 'resp-out')">http_bad</button>
+                <button class="secondary" onclick="runTest('/test/responses/str', 'resp-out')">send_str</button>
+                <button class="secondary" onclick="runTest('/test/responses/json_struct', 'resp-out')">JSON Struct</button>
+                <button class="secondary" onclick="runTest('/test/responses/json_vec', 'resp-out')">JSON Vec</button>
+                <button class="secondary" onclick="runTest('/test/responses/json_macro_bad', 'resp-out')">JSON Bad Macro</button>
+                <button class="secondary" onclick="runTest('/test/responses/json_map', 'resp-out')">JSON Map</button>
+            </div>
+            <div class="output" id="resp-out">Select an HTTP type helper above...</div>
+        </div>
+
+        <!-- WebSocket Card -->
+        <div class="card">
+            <h2>Web Socket Handler</h2>
+            <p style="font-size: 0.9rem; margin-bottom: 10px;">
+                Status: <span id="ws-status-dot" class="status"></span> <span id="ws-status-text">Disconnected</span>
+            </p>
+            <input type="text" id="ws-user-id" value="user123" placeholder="Enter User ID">
+            <div class="btn-group">
+                <button id="ws-connect-btn" onclick="connectWebSocket()">Connect Session</button>
+                <button id="ws-disconnect-btn" class="danger" onclick="disconnectWebSocket()" style="display:none;">Disconnect</button>
+                <button class="secondary" onclick="runTest('/ws-msg', 'ws-out')">Trigger Group Signals</button>
+            </div>
+            <div class="output" id="ws-out" style="max-height: 200px;">WebSocket logs will appear here...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // General API fetching assistant
+    async function runTest(url, outputId) {
+        const outputEl = document.getElementById(outputId);
+        outputEl.innerText = "Processing request...";
+        try {
+            const response = await fetch(url);
+            const contentType = response.headers.get("content-type");
+            
+            let data;
+            if (contentType && contentType.includes("application/json")) {
+                const json = await response.json();
+                data = JSON.stringify(json, null, 2);
+            } else {
+                data = await response.text();
+            }
+            
+            outputEl.innerText = `[Status ${response.status}]\n${data}rs:${response}:dt${data}`;
+        } catch (err) {
+            outputEl.innerText = `Network Error: ${err.message}`;
+        }
+    }
+
+    // WebSocket state tracking
+    let socket = null;
+
+    function connectWebSocket() {
+        const userId = document.getElementById('ws-user-id').value.trim();
+        const wsLog = document.getElementById('ws-out');
+        
+        if (!userId) {
+            alert("Please enter a valid User ID first");
+            return;
+        }
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/${userId}`;
+        
+        wsLog.innerText = `Connecting to: ${wsUrl}\n`;
+
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+            document.getElementById('ws-status-dot').className = "status connected";
+            document.getElementById('ws-status-text').innerText = `Connected as (${userId})`;
+            document.getElementById('ws-connect-btn').style.display = "none";
+            document.getElementById('ws-disconnect-btn').style.display = "inline-block";
+            wsLog.innerText += `[System] Connected successfully!\n`;
+            
+            // Send a test frame immediately to show connection health
+            socket.send(`Hello server! I am ${userId}`);
+        };
+
+        socket.onmessage = (event) => {
+            wsLog.innerText += `[Received]: ${event.data}\n`;
+            wsLog.scrollTop = wsLog.scrollHeight; // Auto-scroll
+        };
+
+        socket.onclose = (event) => {
+            document.getElementById('ws-status-dot').className = "status";
+            document.getElementById('ws-status-text').innerText = "Disconnected";
+            document.getElementById('ws-connect-btn').style.display = "inline-block";
+            document.getElementById('ws-disconnect-btn').style.display = "none";
+            wsLog.innerText += `[System] Connection closed. Code: ${event.code}\n`;
+        };
+
+        socket.onerror = (error) => {
+            wsLog.innerText += `[Error] Socket error encountered\n`;
+        };
+    }
+
+    function disconnectWebSocket() {
+        if (socket) {
+            socket.close();
+        }
+    }
+</script>
+</body>
+</html>
