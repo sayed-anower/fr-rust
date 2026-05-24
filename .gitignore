@@ -1,3 +1,9 @@
 /target
 .env
 !.env.example
+ex.rs
+err.txt
+ex.txt
+ws.rs
+test.rs
+main.rs

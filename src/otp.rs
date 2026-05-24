@@ -1,29 +1,24 @@
 use hmac::{Hmac, Mac};
 use base64::{engine::general_purpose, Engine as _};
-use rand::{RngCore, rngs::OsRng};
+use rand::RngCore;
 use sha2::Sha256;
-use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
+use redis::{Commands, Client};
 
 type HmacSha256 = Hmac<Sha256>;
 
-#[derive(Clone)]
-pub struct OtpRecord {
-    hash: String,
-    expires_at: u64,
-}
-
 pub struct OtpService {
     secret: String,
-    store: std::sync::Mutex<HashMap<String, OtpRecord>>,
+    // Redis client handles connection pooling and is thread-safe (Sync + Send)
+    redis_client: Client,
     ttl_secs: u64,
 }
 
 impl OtpService {
-    pub fn new(secret: String, ttl_secs: u64) -> Self {
+    pub fn new(secret: String, redis_url: &str, ttl_secs: u64) -> Self {
+        let redis_client = Client::open(redis_url).expect("Invalid Redis URL");
         Self {
             secret,
-            store: std::sync::Mutex::new(HashMap::new()),
+            redis_client,
             ttl_secs,
         }
     }
@@ -31,37 +26,39 @@ impl OtpService {
     // Generate OTP
     pub fn generate_otp(&self, user_id: &str, digits: u32) -> String {
         let otp = Self::random_digits(digits);
-
-        let expires_at = Self::now() + self.ttl_secs;
-
         let hash = Self::hmac_hash(&self.secret, &otp);
 
-        let mut store = self.store.lock().unwrap();
-        store.insert(user_id.to_string(), OtpRecord { hash, expires_at });
+        // Get a connection from the client
+        let mut con = self.redis_client.get_connection().expect("Failed to connect to Redis");
+
+        // Use Redis native EXPIRE (TTL) so expired tokens are automatically purged by Redis
+        let redis_key = format!("otp:{}", user_id);
+        let _: () = con.set_ex(redis_key, hash, self.ttl_secs).expect("Failed to save OTP to Redis");
 
         otp
     }
 
     // Verify OTP
     pub fn verify_otp(&self, user_id: &str, otp: &str) -> bool {
-        let mut store = self.store.lock().unwrap();
+        let mut con = self.redis_client.get_connection().expect("Failed to connect to Redis");
+        let redis_key = format!("otp:{}", user_id);
 
-        let record = match store.get(user_id) {
-            Some(r) => r.clone(),
-            None => return false,
+        // Fetch the stored hash directly from Redis
+        let stored_hash: Option<String> = con.get(&redis_key).expect("Failed to fetch OTP from Redis");
+
+        let hash_to_check = match stored_hash {
+            Some(h) => h,
+            None => return false, // Expired or never existed
         };
 
-        if Self::now() > record.expires_at {
-            store.remove(user_id);
-            return false;
-        }
+        let calculated_hash = Self::hmac_hash(&self.secret, otp);
 
-        let hash = Self::hmac_hash(&self.secret, otp);
-
-        let ok = hash == record.hash;
+        // Constant-time verification or direct string comparison
+        let ok = calculated_hash == hash_to_check;
 
         if ok {
-            store.remove(user_id); // OTP can only be used once
+            // OTP can only be used once; delete it immediately upon successful verification
+            let _: () = con.del(redis_key).expect("Failed to delete used OTP");
         }
 
         ok
@@ -69,11 +66,12 @@ impl OtpService {
 
     // Helpers
     fn random_digits(digits: u32) -> String {
-        let num = 0u64;
-        OsRng.fill_bytes(&mut num.to_le_bytes());
+        // FIX: Correctly fetch random bytes into an actual mutable variable
+        let mut bytes = [0u8; 8];
+        rand::rngs::OsRng.fill_bytes(&mut bytes);
+        let num = u64::from_le_bytes(bytes);
 
         let otp = num % 10u64.pow(digits);
-
         format!("{:0width$}", otp, width = digits as usize)
     }
 
@@ -85,12 +83,5 @@ impl OtpService {
 
         let result = mac.finalize().into_bytes();
         general_purpose::STANDARD.encode(result)
-    }
-
-    fn now() -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
     }
 }

@@ -86,16 +86,16 @@ async fn test_crypto() -> Rsp {
 // Database Feature
 #[get("/test/db")]
 async fn test_db() -> Rsp {
-    let database_url = env_var("DATABASE_URL", "postgresql://un:pwd@localhost:5432/db");
-    let pool = create_db_pool(database_url);
+    let database_url = env_var("DATABASE_URL");
+    let pool = DbPool::new(database_url);
     
-    let _ = db_execute(&pool, "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT, age INT);", &[]).await;
+    let _ = pool.execute(&pool, "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT, age INT);", &[]).await;
     
     let insert_query = "INSERT INTO users (name, age) VALUES ($1, $2);";
-    let _ = db_execute(&pool, insert_query, &[&"Alice", &30]).await;
+    let _ = pool.execute(&pool, insert_query, &[&"Alice", &30]).await;
     
     let select_all_query = "SELECT id, name, age FROM users;";
-    let rows = db_query(&pool, select_all_query, &[]).await.unwrap();
+    let rows = pool.query(&pool, select_all_query, &[]).await.unwrap();
     let mut users = Vec::new();
     for row in rows {
         let id: i32 = row.get("id");
@@ -105,11 +105,11 @@ async fn test_db() -> Rsp {
     }
     
     let select_one_query = "SELECT name FROM users WHERE id = $1;";
-    let row = db_query_one(&pool, select_one_query, &[&1]).await.unwrap();
+    let row = pool.query_one(&pool, select_one_query, &[&1]).await.unwrap();
     let name: String = row.get("name");
     
     let select_opt_query = "SELECT name FROM users WHERE id = $1;";
-    let maybe_row = db_query_opt(&pool, select_opt_query, &[&999]).await.unwrap();
+    let maybe_row = pool.query_opt(&pool, select_opt_query, &[&999]).await.unwrap();
     let fallback = match maybe_row {
         Some(r) => r.get("name"),
         None => "User 999 does not exist (Safe fallback!).".to_string(),
@@ -215,8 +215,7 @@ async fn test_responses(path: Path<String>) -> Rsp {
 // APP CONFIGURATION & MAIN
 pub fn app_config(cfg: &mut ServiceConfig) {
     // 1. Instantiating and registering the shared state for your route extraction
-    let ws_manager = WsManager::new();
-    cfg.app_data(AppData::new(ws_manager));
+
 
     // 2. Fixed broken syntax chaining (attached to `cfg`)
     cfg.service(index_file)

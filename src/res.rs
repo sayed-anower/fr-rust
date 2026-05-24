@@ -13,7 +13,7 @@ pub fn send_json<T: Serialize>(data: T) -> HttpResponse {
 }
 
 // Sends a file
-pub async fn send_file(path: &'static str) -> Result<NamedFile> {
+pub async fn send_file(path: &str) -> Result<NamedFile> {
     Ok(NamedFile::open_async(path).await?)
 }
 

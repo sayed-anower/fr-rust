@@ -46,3 +46,9 @@ lettre = { version = "0.11.22", default-features = false, features = [
 
 # For safety
 openssl-sys = { version = "0.9", features = ["vendored"] }
+
+# Redis
+redis = { version = "0.26", features = ["tokio-comp"] }
+
+# For errors
+thiserror = "1.0"

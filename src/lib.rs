@@ -9,7 +9,8 @@ pub mod otp;
 pub mod res;
 pub mod routes;
 pub mod server;
-pub mod ws;
+// pub mod ws;
+pub mod redis;
 pub use actix_web::main;
 
 // Alias
@@ -78,7 +79,7 @@ pub mod prelude {
 
     pub use crate::crypto;
 
-    pub use crate::crypto::{CryptoConfig, decrypt_text, encrypt_text, hash_data, verify_hash};
+    pub use crate::crypto::{CryptoService};
 
     // =========================
     // OTP
@@ -94,7 +95,7 @@ pub mod prelude {
 
     pub use crate::email;
 
-    pub use crate::email::{EmailConfig, EmailData, send_email};
+    pub use crate::email::{EmailService, EmailConfig, EmailData, send_email};
 
     // =========================
     // DB
@@ -102,7 +103,7 @@ pub mod prelude {
 
     pub use crate::db;
 
-    pub use crate::db::{DbPool, create_db_pool, db_execute, db_query, db_query_one, db_query_opt};
+    pub use crate::db::{DbPool};
 
     // =========================
     // Routes
@@ -119,11 +120,11 @@ pub mod prelude {
     // =========================
     // WebSocket
     // =========================
-
+/*
     pub use crate::ws;
 
     pub use crate::ws::{AppMessage, WsManager};
-
+*/
     // =========================
     // Responses
     // =========================
@@ -141,4 +142,13 @@ pub mod prelude {
     pub use crate::clean as cl;
 
     pub use crate::cl::{Rlt, RltRsp, Rsp, MainRlt, FileRlt, Rqs};
+    
+        
+    // =========================
+    // Redis
+    // =========================
+    pub use crate::redis;
+    pub use crate::redis::{
+        RedisManager
+    };
 }

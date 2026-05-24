@@ -1,73 +1,94 @@
-use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod, Runtime};
-use std::{sync::Arc};
-use tokio_postgres::{Config, NoTls, Row, types::ToSql};
+use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod, Runtime, PoolError};
+use tokio_postgres::{Config, NoTls, Row, types::ToSql, Error as PgError};
 
-pub type DbPool = Arc<Pool>;
-
-// Create PostgreSQL connection pool
-pub fn create_db_pool(database_url: String) -> DbPool {
-    let config: Config = database_url.parse().expect("Invalid DATABASE_URL");
-
-    let mgr_config = ManagerConfig {
-        recycling_method: RecyclingMethod::Fast,
-    };
-
-    let manager = Manager::from_config(config, NoTls, mgr_config);
-
-    // Optimized pool
-    let pool = Pool::builder(manager)
-        .max_size(32)
-        .runtime(Runtime::Tokio1)
-        .build()
-        .expect("Failed to build pool");
-
-    Arc::new(pool)
+/// A highly optimized, easily clonable Database Pool wrapper.
+#[derive(Clone)]
+pub struct DbPool {
+    pool: Pool,
 }
 
-// Execute INSERT / UPDATE / DELETE
-// Returns affected rows
-pub async fn db_execute(
-    pool: &DbPool,
-    query: &str,
-    params: &[&(dyn ToSql + Sync)],
-) -> Result<u64, tokio_postgres::Error> {
-    let client = pool.get().await.unwrap();
-
-    client.execute(query, params).await
+/// Unified error type for both connection pooling and database queries.
+#[derive(Debug)]
+pub enum DbError {
+    Pool(PoolError),
+    Query(PgError),
 }
 
-// Get ONE row
-pub async fn db_query_one(
-    pool: &DbPool,
-    query: &str,
-    params: &[&(dyn ToSql + Sync)],
-) -> Result<Row, Box<dyn std::error::Error>> {
-    // Handles both pool and query errors
-    let client = pool.get().await?;
-    let row = client.query_one(query, params).await?;
-    Ok(row)
+impl From<PoolError> for DbError {
+    fn from(err: PoolError) -> Self {
+        DbError::Pool(err)
+    }
 }
 
-// Get ONE row or none
-pub async fn db_query_opt(
-    pool: &DbPool,
-    query: &str,
-    params: &[&(dyn ToSql + Sync)],
-) -> Result<Option<Row>, tokio_postgres::Error> { // <- Changed return type
-    let client = pool.get().await.unwrap();
-
-    let row_opt = client.query_opt(query, params).await?;
-    Ok(row_opt)
+impl From<PgError> for DbError {
+    fn from(err: PgError) -> Self {
+        DbError::Query(err)
+    }
 }
 
-// Get MANY rows
-pub async fn db_query(
-    pool: &DbPool,
-    query: &str,
-    params: &[&(dyn ToSql + Sync)],
-) -> Result<Vec<Row>, tokio_postgres::Error> {
-    let client = pool.get().await.unwrap();
+impl DbPool {
+    /// Create a new PostgreSQL connection pool
+    pub fn new(database_url: String) -> Self {
+        let config: Config = database_url.parse().expect("Invalid DATABASE_URL");
 
-    let rows = client.query(query, params).await?;
-    Ok(rows)
+        let mgr_config = ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
+        };
+
+        let manager = Manager::from_config(config, NoTls, mgr_config);
+
+        // Build the optimized pool
+        let pool = Pool::builder(manager)
+            .max_size(32) // Adjust based on your server's core count (e.g., 4x cores)
+            .runtime(Runtime::Tokio1)
+            .build()
+            .expect("Failed to build pool");
+
+        DbPool { pool }
+    }
+
+    /// Execute INSERT / UPDATE / DELETE
+    /// Returns affected rows
+    pub async fn execute(
+        &self,
+        query: &str,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<u64, DbError> {
+        let client = self.pool.get().await?;
+        let affected = client.execute(query, params).await?;
+        Ok(affected)
+    }
+
+    /// Get ONE row
+    pub async fn query_one(
+        &self,
+        query: &str,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Row, DbError> {
+        let client = self.pool.get().await?;
+        let row = client.query_one(query, params).await?;
+        Ok(row)
+    }
+
+    /// Get ONE row or none
+    pub async fn query_opt(
+        &self,
+        query: &str,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<Row>, DbError> {
+        let client = self.pool.get().await?;
+        let row_opt = client.query_opt(query, params).await?;
+        Ok(row_opt)
+    }
+
+    /// Get MANY rows
+    pub async fn query(
+        &self,
+        query: &str,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<Row>, DbError> {
+        let client = self.pool.get().await?;
+        let rows = client.query(query, params).await?;
+        Ok(rows)
+    }
 }
