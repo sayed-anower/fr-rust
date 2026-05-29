@@ -9,7 +9,8 @@ pub mod otp;
 pub mod res;
 pub mod routes;
 pub mod server;
-// pub mod ws;
+pub mod utils;
+pub mod ws;
 pub mod redis;
 pub use actix_web::main;
 
@@ -64,7 +65,7 @@ pub mod prelude {
     // STD
     // =========================
 
-    pub use std::{collections::HashMap, env, io::Result};
+    pub use std::{collections::HashMap, env, io::Result, sync::Arc};
 
     // =========================
     // Server
@@ -120,11 +121,10 @@ pub mod prelude {
     // =========================
     // WebSocket
     // =========================
-/*
     pub use crate::ws;
 
-    pub use crate::ws::{AppMessage, WsManager};
-*/
+    pub use crate::ws::{WsManager};
+    
     // =========================
     // Responses
     // =========================
@@ -149,6 +149,16 @@ pub mod prelude {
     // =========================
     pub use crate::redis;
     pub use crate::redis::{
-        RedisManager
+        RedisManager,
+        RedisConfig
+    };
+    
+    // =========================
+    // Redis
+    // =========================
+    pub use crate::utils;
+    pub use crate::utils::{
+        input,
+        generate_token
     };
 }
