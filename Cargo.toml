@@ -2,6 +2,7 @@
 name = "fr-rust"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
 # Web, Files and WebSocket
@@ -34,6 +35,7 @@ base64 = "0.22"
 
 # Randomness
 rand = "0.8"
+hex = "0.4"
 
 # Email
 lettre = { version = "0.11.22", default-features = false, features = [
@@ -48,7 +50,14 @@ lettre = { version = "0.11.22", default-features = false, features = [
 openssl-sys = { version = "0.9", features = ["vendored"] }
 
 # Redis
-redis = { version = "0.26", features = ["tokio-comp"] }
+redis = { version = "0.32", features = [
+"tokio-comp",
+"connection-manager",
+] }
 
-# For errors
-thiserror = "1.0"
+# Web Socket
+# dashmap = "6"
+# uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+async-trait = "0.1"
