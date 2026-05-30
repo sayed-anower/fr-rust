@@ -6,7 +6,7 @@ pub type Rlt = Result<(), Error>;
 // A clean shorthand response
 pub type Rsp = HttpResponse;
 // Email result
-pub type EmailRsl
+// pub type EmailRsl
 // A clean shorthand for a standard Actix Result
 pub type RltRsp = Result<HttpResponse, Error>;
 // A clean shorthand request
