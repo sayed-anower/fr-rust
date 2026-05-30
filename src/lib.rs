@@ -45,7 +45,9 @@ pub mod prelude {
     pub use tokio;
     pub use tokio_postgres;
     pub use uuid;
-
+    use actix_multipart::{
+        Multipart
+    };
     // =========================
     // Actix Web
     // =========================
@@ -132,7 +134,7 @@ pub mod prelude {
     pub use crate::res;
 
     pub use crate::res::{
-        http_bad, http_bad_json, http_ok, http_ok_json, send_file, send_json, send_str,
+        http_bad, http_bad_json, http_ok, http_ok_json, send_file, send_json, send_str, upload_file
     };
 
     // =========================
