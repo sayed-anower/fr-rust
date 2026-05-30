@@ -1,13 +1,13 @@
 // These all are available to prelude already, just simply use.
 // Feels easy
 pub mod clean;
-pub mod config;
+// pub mod config;
 pub mod crypto;
 pub mod db;
 pub mod email;
 pub mod otp;
 pub mod res;
-pub mod routes;
+// pub mod routes;
 pub mod server;
 pub mod utils;
 pub mod ws;
