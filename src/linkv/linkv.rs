@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use rand::RngCore;
 use ::redis::AsyncCommands; // Fixed ambiguity with leading `::`
-
+#[derive(Clone)]
 pub struct LinkVConfig {
     pub secret: String,
     pub crypto: CryptoService,
