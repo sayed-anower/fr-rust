@@ -17,7 +17,6 @@ impl LinkV {
     pub fn new(config: LinkVConfig) -> Self {
         Self { config }
     }
-
     pub async fn generate_token(&self, user_id: &str) -> anyhow::Result<String> {
         let mut token_bytes = vec![0u8; 256];
         rand::thread_rng().fill_bytes(&mut token_bytes);
@@ -26,8 +25,8 @@ impl LinkV {
         
         let mut con = self.config.redis.connection.clone();
         
-        // Added turbofish <_, _, ()> to specify the expected return type is ()
-        con.set_ex::<_, _, ()>(&redis_key, "1", self.config.ttl_secs).await?;
+        // Force the type system to register the output as ()
+        let _res: () = con.set_ex(&redis_key, "1", self.config.ttl_secs).await?;
         
         Ok(token)
     }
@@ -39,11 +38,12 @@ impl LinkV {
         let is_valid: bool = con.exists(&redis_key).await?;
         
         if is_valid {
-            // Added turbofish <_, ()> to specify the expected return type is ()
-            con.del::<_, ()>(&redis_key).await?;
+            // Force the type system to register the output as ()
+            let _res: () = con.del(&redis_key).await?;
             Ok(true)
         } else {
             Ok(false)
         }
     }
+
 }
