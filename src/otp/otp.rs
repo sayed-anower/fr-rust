@@ -8,7 +8,7 @@ pub struct OtpConfig {
     pub redis: RedisManager,
     pub ttl_secs: u64,
 }
-
+#[derive(Clone)]
 pub struct OtpService {
     config: OtpConfig,
 }
