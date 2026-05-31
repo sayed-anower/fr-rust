@@ -8,7 +8,7 @@ pub struct LinkVConfig {
     pub redis: RedisManager,
     pub ttl_secs: u64,
 }
-
+#[derive(Clone)]
 pub struct LinkV {
     config: LinkVConfig,
 }
