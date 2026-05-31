@@ -22,7 +22,7 @@ impl LinkV {
         rand::thread_rng().fill_bytes(&mut token_bytes);
         let token = hex::encode(token_bytes);
         let redis_key = format!("linkv:verify:{}:{}", user_id, token);
-        self.config.redis.set_ttl(&redis_key, "1", self.config.ttl_secs).await?;
+        self.config.redis.set_ex(&redis_key, "1", self.config.ttl_secs).await?;
         Ok(token)
     }
     pub async fn verify_token(&self, user_id: &str, token: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
