@@ -31,7 +31,7 @@ async fn main() -> MainRlt {
 
     // Redis
     let redis_url = env_var("REDIS_URL");
-    let redis = RedisManager::new(redis_config).await.unwrap();
+    let redis = RedisManager::new(redis_url).await.unwrap();
     // Crypto
     let key = env_var("AES_KEY");
     let key_bytes: &[u8; 32] = key.as_bytes().try_into().expect("AES_KEY must be exactly 32 bytes");
