@@ -30,12 +30,7 @@ async fn main() -> MainRlt {
     let pool = DbPool::new(database_url);
 
     // Redis
-    let redis_config = RedisConfig {
-            url: env_var("REDIS_URL"),
-            max_channels_per_pubsub: 2, 
-            flush_interval_ms: 100, 
-            pool_max_size: 3, 
-    };
+    let redis_url = env_var("REDIS_URL");
     let redis = RedisManager::new(redis_config).await.unwrap();
     // Crypto
     let key = env_var("AES_KEY");
