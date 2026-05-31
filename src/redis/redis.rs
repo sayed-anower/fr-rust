@@ -1,21 +1,18 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-
-use deadpool::managed::PoolConfig;
-use deadpool_redis::{Config as DeadpoolConfig, Pool, Runtime};
-use futures::StreamExt;
-use redis::{AsyncCommands, Client, ErrorKind, RedisError, RedisResult};
-use serde::{de::DeserializeOwned, Serialize};
+use futures_util::StreamExt;
+use serde::{Serialize, de::DeserializeOwned};
 use tokio::sync::{broadcast, mpsc};
+
+// Type aliases for cleaner code signatures
+pub type RedisResult<T> = Result<T, redis::RedisError>;
+use redis::{Client, AsyncCommands, ErrorKind, RedisError};
+use deadpool_redis::{Pool, Config as DeadpoolConfig, PoolConfig, Runtime};
 
 /// =======================================================
 /// HIGH PERFORMANCE REDIS FRAMEWORK (FIXED)
-/// - deadpool-redis connection pool for all commands
-/// - Batched pubsub workers (configurable channel limit)
-/// - Local in-memory broadcast bus (std::sync::RwLock optimized)
-/// - Zero unwraps, fully typed JSON
 /// =======================================================
 
 #[derive(Debug, Clone)]
@@ -31,23 +28,21 @@ pub struct RedisConfig {
 
 #[derive(Clone)]
 pub struct RedisManager {
+    #[allow(dead_code)]
     client: Client,
     pool: Pool,
     #[allow(dead_code)]
     config: RedisConfig,
     /// In-memory broadcast bus: Redis channel -> local sender
-    /// Optimized with std::sync::RwLock for synchronous hot-path lookups
     local_channels: Arc<RwLock<HashMap<String, broadcast::Sender<String>>>>,
-    /// Request new Redis subscriptions here (coordinated in background)
+    /// Request new Redis subscriptions here
     sub_tx: mpsc::Sender<String>,
 }
 
 impl RedisManager {
-    /// Create the framework.
     pub async fn new(config: RedisConfig) -> RedisResult<Self> {
         let client = Client::open(&config.url)?;
 
-        // Build the deadpool command pool
         let mut dp_cfg = DeadpoolConfig::from_url(&config.url);
         dp_cfg.pool = Some(PoolConfig {
             max_size: config.pool_max_size,
@@ -64,7 +59,7 @@ impl RedisManager {
                 ))
             })?;
 
-        // Warm-up: verify we can grab a connection
+        // Warm-up connection check
         let _ = pool.get().await.map_err(|e| {
             RedisError::from((
                 ErrorKind::IoError,
@@ -74,10 +69,8 @@ impl RedisManager {
         })?;
 
         let local_channels = Arc::new(RwLock::new(HashMap::new()));
-        // Bounded channel to enforce backpressure and avoid OOM scenarios
         let (sub_tx, sub_rx) = mpsc::channel::<String>(4096);
 
-        // Spawn the pubsub coordinator that batches channels into few Redis tasks
         tokio::spawn(pubsub_coordinator(
             sub_rx,
             client.clone(),
@@ -95,9 +88,6 @@ impl RedisManager {
         })
     }
 
-    // -------------------------------------------------------
-    // JSON helpers (no unwraps)
-    // -------------------------------------------------------
     fn serialize<T: Serialize>(value: T) -> RedisResult<String> {
         serde_json::to_string(&value).map_err(|e| {
             RedisError::from((
@@ -118,9 +108,6 @@ impl RedisManager {
         })
     }
 
-    // -------------------------------------------------------
-    // Pool helper
-    // -------------------------------------------------------
     async fn conn(&self) -> RedisResult<deadpool_redis::Connection> {
         self.pool.get().await.map_err(|e| {
             RedisError::from((
@@ -131,9 +118,7 @@ impl RedisManager {
         })
     }
 
-    // -------------------------------------------------------
     // Basic KV
-    // -------------------------------------------------------
     pub async fn set<T>(&self, key: &str, value: T) -> RedisResult<()>
     where
         T: Serialize,
@@ -142,12 +127,7 @@ impl RedisManager {
         conn.set(key, Self::serialize(value)?).await
     }
 
-    pub async fn set_ttl<T>(
-        &self,
-        key: &str,
-        value: T,
-        ttl_seconds: u64,
-    ) -> RedisResult<()>
+    pub async fn set_ttl<T>(&self, key: &str, value: T, ttl_seconds: u64) -> RedisResult<()>
     where
         T: Serialize,
     {
@@ -187,17 +167,13 @@ impl RedisManager {
         conn.ttl(key).await
     }
 
-    // -------------------------------------------------------
-    // Hash
-    // -------------------------------------------------------
+    // Hash Map Actions
     pub async fn hset<T>(&self, key: &str, field: &str, value: T) -> RedisResult<()>
     where
         T: Serialize,
     {
         let mut conn = self.conn().await?;
-        conn.hset(key, field, Self::serialize(value)?)
-            .await
-            .map(|_| ())
+        conn.hset(key, field, Self::serialize(value)?).await.map(|_| ())
     }
 
     pub async fn hget<T>(&self, key: &str, field: &str) -> RedisResult<Option<T>>
@@ -217,17 +193,13 @@ impl RedisManager {
         conn.hdel(key, field).await.map(|_| ())
     }
 
-    // -------------------------------------------------------
-    // List
-    // -------------------------------------------------------
+    // Lists
     pub async fn lpush<T>(&self, key: &str, value: T) -> RedisResult<()>
     where
         T: Serialize,
     {
         let mut conn = self.conn().await?;
-        conn.lpush(key, Self::serialize(value)?)
-            .await
-            .map(|_| ())
+        conn.lpush(key, Self::serialize(value)?).await.map(|_| ())
     }
 
     pub async fn rpush<T>(&self, key: &str, value: T) -> RedisResult<()>
@@ -235,9 +207,7 @@ impl RedisManager {
         T: Serialize,
     {
         let mut conn = self.conn().await?;
-        conn.rpush(key, Self::serialize(value)?)
-            .await
-            .map(|_| ())
+        conn.rpush(key, Self::serialize(value)?).await.map(|_| ())
     }
 
     pub async fn lrange<T>(&self, key: &str, start: isize, stop: isize) -> RedisResult<Vec<T>>
@@ -246,22 +216,16 @@ impl RedisManager {
     {
         let mut conn = self.conn().await?;
         let vals: Vec<String> = conn.lrange(key, start, stop).await?;
-        vals.into_iter()
-            .map(|v| Self::deserialize(&v))
-            .collect()
+        vals.into_iter().map(|v| Self::deserialize(&v)).collect()
     }
 
-    // -------------------------------------------------------
-    // Set
-    // -------------------------------------------------------
+    // Sets
     pub async fn sadd<T>(&self, key: &str, value: T) -> RedisResult<()>
     where
         T: Serialize,
     {
         let mut conn = self.conn().await?;
-        conn.sadd(key, Self::serialize(value)?)
-            .await
-            .map(|_| ())
+        conn.sadd(key, Self::serialize(value)?).await.map(|_| ())
     }
 
     pub async fn smembers<T>(&self, key: &str) -> RedisResult<Vec<T>>
@@ -270,28 +234,20 @@ impl RedisManager {
     {
         let mut conn = self.conn().await?;
         let vals: Vec<String> = conn.smembers(key).await?;
-        vals.into_iter()
-            .map(|v| Self::deserialize(&v))
-            .collect()
+        vals.into_iter().map(|v| Self::deserialize(&v)).collect()
     }
 
-    // -------------------------------------------------------
-    // Pipeline
-    // -------------------------------------------------------
-    pub async fn pipeline_set(&self, data: Vec<(&str, &str)>) -> RedisResult<()> {
+    // Pipelines
+    pub async fn pipeline_set(&self, data: Vec<(&str, String)>) -> RedisResult<()> {
         let mut conn = self.conn().await?;
         let mut pipe = redis::pipe();
         for (k, v) in &data {
-            pipe.set(k, v);
+            pipe.set(*k, v);
         }
-        pipe.query_async::<_, Vec<redis::Value>>(&mut *conn)
-            .await
-            .map(|_| ())
+        pipe.query_async::<_, Vec<redis::Value>>(&mut *conn).await.map(|_| ())
     }
 
-    // -------------------------------------------------------
     // Cache Pattern
-    // -------------------------------------------------------
     pub async fn cache_or_fetch<T, F, Fut>(&self, key: &str, ttl: u64, fetcher: F) -> RedisResult<T>
     where
         T: Serialize + DeserializeOwned + Clone,
@@ -307,10 +263,7 @@ impl RedisManager {
         Ok(data)
     }
 
-    // -------------------------------------------------------
     // Pub/Sub
-    // -------------------------------------------------------
-
     pub async fn publish<T>(&self, channel: &str, message: T) -> RedisResult<()>
     where
         T: Serialize,
@@ -320,7 +273,7 @@ impl RedisManager {
         conn.publish(channel, msg).await.map(|_| ())
     }
 
-    /// Fixed Race Condition using the entry API
+    /// Fixed Race Condition & Guard Lifetimes
     pub async fn subscribe_channel(&self, channel: &str) -> broadcast::Receiver<String> {
         let mut guard = self.local_channels.write().unwrap();
         
@@ -330,10 +283,9 @@ impl RedisManager {
                 let (tx, rx) = broadcast::channel(1024);
                 entry.insert(tx);
                 
-                // Drop lock early before engaging in potential async channel waiting
+                // Explicitly drop guard here so sub_tx async work doesn't extend lock lifetime
                 drop(guard); 
                 
-                // If the coordinator dropped, this will return an error, but we return rx anyway
                 let _ = self.sub_tx.send(channel.to_string()).await;
                 rx
             }
@@ -361,11 +313,15 @@ impl RedisManager {
         let mut rx = self.subscribe_channel(channel).await;
         tokio::spawn(async move {
             while let Ok(msg) = rx.recv().await {
-                match Self::deserialize::<T>(&msg) {
-                    Ok(data) => handler(data),
-                    Err(e) => {
-                        eprintln!("subscribe_json deserialization error: {e}");
+                if let Ok(serde_str) = Self::deserialize::<String>(&msg) {
+                    if let Ok(data) = Self::deserialize::<T>(&serde_str) {
+                        handler(data);
+                        continue;
                     }
+                }
+                // Fallback direct deserialize
+                if let Ok(data) = Self::deserialize::<T>(&msg) {
+                    handler(data);
                 }
             }
         });
@@ -377,10 +333,6 @@ impl RedisManager {
         guard.remove(channel);
     }
 }
-
-// =======================================================
-// PubSub Coordinator
-// =======================================================
 
 async fn pubsub_coordinator(
     mut rx: mpsc::Receiver<String>,
@@ -412,10 +364,6 @@ async fn pubsub_coordinator(
     }
 }
 
-// =======================================================
-// Self-Healing Robust PubSub Worker
-// =======================================================
-
 fn spawn_pubsub_worker(
     client: Client,
     channels: Vec<String>,
@@ -423,22 +371,18 @@ fn spawn_pubsub_worker(
 ) {
     tokio::spawn(async move {
         let mut backoff = Duration::from_secs(1);
-        
-        // Loop allows connection self-healing if a disconnect happens
         loop {
             let mut pubsub = match client.get_async_pubsub().await {
                 Ok(p) => p,
                 Err(e) => {
-                    eprintln!("PubSub connection failed: {e}. Retrying in {backoff:?}...");
+                    eprintln!("PubSub connection failed: {e}. Retrying...");
                     tokio::time::sleep(backoff).await;
                     backoff = std::cmp::min(backoff * 2, Duration::from_secs(30));
                     continue;
                 }
             };
             
-            // Reset backoff on success
             backoff = Duration::from_secs(1);
-
             let mut subscribed_any = false;
             for ch in &channels {
                 if let Err(e) = pubsub.subscribe(ch).await {
@@ -448,33 +392,19 @@ fn spawn_pubsub_worker(
                 }
             }
 
-            if !subscribed_any {
-                eprintln!("Worker failed to subscribe to any channel in batch. Exiting worker.");
-                return;
-            }
+            if !subscribed_any { return; }
 
             let mut stream = pubsub.on_message();
-            
             while let Some(msg) = stream.next().await {
                 let channel = msg.get_channel_name();
-                let payload: RedisResult<String> = msg.get_payload();
-                
-                match payload {
-                    Ok(p) => {
-                        // Synchronous standard read lock used here. Fast and lightweight.
-                        if let Ok(guard) = local_channels.read() {
-                            if let Some(tx) = guard.get(channel) {
-                                // Ignore send errors (e.g. if all receivers have dropped)
-                                let _ = tx.send(p);
-                            }
+                if let Ok(p) = msg.get_payload::<String>() {
+                    if let Ok(guard) = local_channels.read() {
+                        if let Some(tx) = guard.get(channel) {
+                            let _ = tx.send(p);
                         }
                     }
-                    Err(e) => eprintln!("PubSub payload error: {e}"),
                 }
             }
-
-            // If we break out of the stream loop, the stream hit None (connection lost).
-            eprintln!("PubSub stream disconnected. Attempting reconnection for batch...");
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
     });

@@ -1,21 +1,17 @@
 // These all are available to prelude already, just simply use.
 // Feels easy
 pub mod clean;
-// pub mod config;
 pub mod crypto;
 pub mod db;
 pub mod email;
 pub mod otp;
 pub mod res;
-// pub mod routes;
 pub mod server;
 pub mod utils;
 pub mod ws;
 pub mod redis;
-pub use actix_web::main;
-
-// Alias
-pub use clean as cl;
+pub mod linkv;
+pub mod ddos;
 
 // Feels easy
 pub mod prelude {
@@ -33,6 +29,7 @@ pub mod prelude {
     pub use dashmap;
     pub use deadpool_postgres;
     pub use dotenvy;
+    pub use dotenvy::{dotenv};
     pub use futures_util;
     pub use futures_util::StreamExt;
     pub use hmac;
@@ -45,16 +42,18 @@ pub mod prelude {
     pub use tokio;
     pub use tokio_postgres;
     pub use uuid;
-    use actix_multipart::{
+    pub use actix_multipart;
+    pub use actix_multipart::{
         Multipart
     };
+    
     // =========================
     // Actix Web
     // =========================
 
     pub use actix_web::{
         HttpRequest, Responder, delete, get, patch, post, put, rt,
-        web::{Data as AppData, Form, Json, Path, Payload, Query, ServiceConfig},
+        web::{Form, Json, Path, Payload, Query, ServiceConfig},
     };
 
     // =========================
@@ -105,7 +104,6 @@ pub mod prelude {
     // =========================
 
     pub use crate::db;
-
     pub use crate::db::{DbPool};
 
     // =========================
@@ -143,7 +141,7 @@ pub mod prelude {
 
     pub use crate::clean as cl;
 
-    pub use crate::cl::{Rlt, RltRsp, Rsp, MainRlt, FileRlt, Rqs};
+    pub use crate::cl::{Rlt, Rsp, RltRsp, MainRlt, FileRlt, Rqs};
     
         
     // =========================
@@ -159,8 +157,34 @@ pub mod prelude {
     // Redis
     // =========================
     pub use crate::utils;
-    pub use crate::utils::{
+    pub use crate::{
+    utils::{
         input,
-        generate_token
+        generate_token,
+        index_file::{
+            index_file
+        },
+        config::{
+            app_config
+        }
+    }
+    };
+
+    // =========================
+    // Link Verification
+    // =========================
+    pub use crate::linkv;
+    pub use crate::linkv::{
+        LinkV,
+        LinkVConfig
+    };
+
+    // =========================
+    // DDoS Protection
+    // =========================
+    pub use crate::ddos;
+    pub use crate::ddos::{
+        DdosConfig,
+        DdosShield
     };
 }

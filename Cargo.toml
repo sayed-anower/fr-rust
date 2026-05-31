@@ -2,7 +2,6 @@
 name = "fr-rust"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
 
 [dependencies]
 # Web, Files and WebSocket
@@ -57,8 +56,6 @@ redis = { version = "0.32", features = [
 ] }
 
 # Web Socket
-# dashmap = "6"
-# uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 async-trait = "0.1"

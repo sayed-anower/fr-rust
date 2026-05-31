@@ -1,7 +1,6 @@
 # ⚡ FR-RUST
 
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **FR-RUST** is an ultra-fast, developer-friendly web backend framework for Rust. Built on top of the robust ecosystem of Actix (one of the fastest web servers available), FR-RUST strips away the steep learning curve and verbose boilerplate. It provides an elegant, expressive, and simplified syntax without introducing any performance overhead.
 
@@ -14,6 +13,8 @@ FR-RUST comes pre-packaged with out-of-the-box batteries to accelerate your back
 - **Minimalist Syntax:** Drastically reduced boilerplate with zero performance compromises.
 - **Built-in Email Service:** Seamlessly connect and dispatch transactional emails.
 - **OTP Service:** Native generation and lifecycle management for One-Time Passwords.
+- **Link Verification Service:** Secure email-based link verification featuring custom validity time expiration windows.
+- **DDoS Protection:** Enterprise-grade, modern rate-limiting and traffic-shaping guardrails to intercept and mitigate distributed attacks.
 - **Advanced DB Management:** Simplified PostgreSQL/Database connection pooling and queries.
 - **Crypto & Security Suite:** Effortless AES text encryption/decryption and hashing operations.
 - **Expressive Responses:** Clean helpers for JSON, Strings, and HTTP status handling.

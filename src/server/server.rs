@@ -1,18 +1,5 @@
-use actix_web::{App, HttpServer, dev::Server, web};
 use dotenvy::dotenv;
 use std::env;
-
-// Run the server
-pub fn run_server<F>(app_config: F, address: &str) -> Result<Server, std::io::Error>
-where
-    F: Fn(&mut web::ServiceConfig) + Send + Clone + 'static,
-{
-    let server = HttpServer::new(move || App::new().configure(app_config.clone()))
-        .bind(address)?
-        .run();
-
-    Ok(server)
-}
 
 // Initialized env
 pub fn init_env() {
