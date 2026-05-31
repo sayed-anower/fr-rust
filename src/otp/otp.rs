@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use rand::{rngs::OsRng, RngCore};
+use ::redis::AsyncCommands; // Fixed ambiguity with leading `::`
 
 pub struct OtpConfig {
     pub secret: String,
@@ -22,12 +23,11 @@ impl OtpService {
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
         let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
         let redis_key = format!("otp:{}", user_id);
-
-        // 3. Get a mutable handle to the connection
+        
         let mut con = self.config.redis.connection.clone();
         
-        // 4. Call the command on your mutable connection handle
-        con.set_ex(&redis_key, &hash, self.config.ttl_secs).await?;
+        // Added turbofish <_, _, ()> to specify the expected return type is ()
+        con.set_ex::<_, _, ()>(&redis_key, &hash, self.config.ttl_secs).await?;
         
         Ok(otp)
     }
@@ -35,25 +35,23 @@ impl OtpService {
     pub async fn verify_otp(&self, user_id: &str, otp: &str) -> anyhow::Result<bool> {
         let redis_key = format!("otp:{}", user_id);
         
-        // 3. Get a mutable handle here too
         let mut con = self.config.redis.connection.clone();
-
-        // 4. Call the command on your mutable connection handle
         let stored_hash: Option<String> = con.get(&redis_key).await?;
         
         let hash_to_check = match stored_hash {
             Some(h) => h,
             None => return Ok(false),
         };
-
+        
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
         let calculated_hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
         let ok = calculated_hash == hash_to_check;
         
         if ok {
-            con.del(&redis_key).await?;
+            // Added turbofish <_, ()> to specify the expected return type is ()
+            con.del::<_, ()>(&redis_key).await?;
         }
-
+        
         Ok(ok)
     }
 
