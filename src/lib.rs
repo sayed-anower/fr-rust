@@ -1,6 +1,6 @@
 // These all are available to prelude already, just simply use.
 // Feels easy
-pub mod clean as cl;
+pub mod clean;
 pub mod crypto;
 pub mod db;
 pub mod email;
@@ -128,8 +128,8 @@ pub mod prelude {
     // Clean Looks
     // =========================
 
-    pub use crate::cl;
-    pub use crate::cl::{Rlt, Rsp, RltRsp, MainRlt, FileRlt, Rqs};
+    pub use crate::clean;
+    pub use crate::clean::{Rlt, Rsp, RltRsp, MainRlt, FileRlt, Rqs};
     
         
     // =========================
