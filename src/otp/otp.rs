@@ -16,17 +16,15 @@ impl OtpService {
     pub fn new(config: OtpConfig) -> Self {
         Self { config }
     }
-    pub async fn generate_otp(&self, user_id: &str, digits: u32) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn generate_otp(&self, user_id: &str, digits: u32) -> anyhow::Result<String> {
         let otp = Self::random_digits(digits);
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
-        let hash = self.config.crypto.sha256_hash(&content_to_hash)
-    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
-    .hash;
+        let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
         let redis_key = format!("otp:{}", user_id);
         self.config.redis.set_ex(&redis_key, &hash, self.config.ttl_secs).await?;
         Ok(otp)
     }
-    pub async fn verify_otp(&self, user_id: &str, otp: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn verify_otp(&self, user_id: &str, otp: &str) -> anyhow::Result<bool> {
         let redis_key = format!("otp:{}", user_id);
         let stored_hash: Option<String> = self.config.redis.get(&redis_key).await?;
         let hash_to_check = match stored_hash {
