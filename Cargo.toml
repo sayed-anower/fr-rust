@@ -51,8 +51,9 @@ openssl-sys = { version = "0.9", features = ["vendored"] }
 
 # Redis
 redis = { version = "0.32", features = [
-"tokio-comp",
-"connection-manager",
+    "tokio-comp",
+    "connection-manager",
+    "aio",
 ] }
 deadpool-redis = "0.23"
 
