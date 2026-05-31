@@ -53,7 +53,7 @@ pub mod prelude {
     // =========================
 
     pub use actix_web::{
-        HttpRequest,HttpServer, Responder, delete, get, patch, post, put, rt,
+        HttpRequest, HttpServer,App,  Responder, delete, get, patch, post, put, rt,
         web::{Form, Json, Path, Payload, Query, ServiceConfig, Data as AppData},
     };
 
