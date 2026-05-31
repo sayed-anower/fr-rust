@@ -12,7 +12,8 @@ async fn main() -> MainRlt {
         .window_secs(1)
         .ban_duration_secs(20)
         .block_agent("malicious-bot")
-        .allow_missing_ua(false);
+        .allow_missing_ua(false)
+        .build();
     // Email
     let email_config = EmailConfig {
         smtp_host: env_var("SMTP_HOST"),
@@ -65,14 +66,14 @@ async fn main() -> MainRlt {
     /* START SERVER */
     println!("Starting server at http://{}", address);
     HttpServer::new(move || App::new()
-    .app_data(AppData::new(email_service))
-    .app_data(AppData::new(pool))
-    .app_data(AppData::new(redis))
-    .app_data(AppData::new(crypto_service))
-    .app_data(AppData::new(otp_service))
-    .app_data(AppData::new(linkv_service))
-    .app_data(AppData::new(ws))
+    .app_data(AppData::new(email_service.clone()))
+    .app_data(AppData::new(pool.clone()))
+    .app_data(AppData::new(redis.clone()))
+    .app_data(AppData::new(crypto_service.clone()))
+    .app_data(AppData::new(otp_service.clone()))
+    .app_data(AppData::new(linkv_service.clone()))
+    .app_data(AppData::new(ws.clone()))
     .configure(app_config)
-    .wrap(ddos_shield)
+    .wrap(ddos_shield.clone())
     ).bind(address)?.run().await
 }

@@ -53,7 +53,7 @@ pub mod prelude {
 
     pub use actix_web::{
         HttpRequest, Responder, delete, get, patch, post, put, rt,
-        web::{Form, Json, Path, Payload, Query, ServiceConfig},
+        web::{Form, Json, Path, Payload, Query, ServiceConfig, Data as AppData},
     };
 
     // =========================
@@ -73,14 +73,13 @@ pub mod prelude {
     // =========================
 
     pub use crate::server;
-    pub use crate::server::{env_var, init_env, run_server};
+    pub use crate::server::{env_var, env_var_or_default, init_env};
 
     // =========================
     // Crypto
     // =========================
 
     pub use crate::crypto;
-
     pub use crate::crypto::{CryptoService};
 
     // =========================
@@ -88,16 +87,14 @@ pub mod prelude {
     // =========================
 
     pub use crate::otp;
-
-    pub use crate::otp::OtpService;
+    pub use crate::otp::{OtpService, OtpConfig};
 
     // =========================
     // Email
     // =========================
 
     pub use crate::email;
-
-    pub use crate::email::{EmailService, EmailConfig, EmailData, send_email};
+    pub use crate::email::{EmailService, EmailConfig, EmailData};
 
     // =========================
     // DB
@@ -107,30 +104,22 @@ pub mod prelude {
     pub use crate::db::{DbPool};
 
     // =========================
-    // Routes
-    // =========================
-
-    pub use crate::routes;
-
-    // =========================
     // Config
     // =========================
 
-    pub use crate::config;
+    pub use crate::utils::config::app_config;
 
     // =========================
     // WebSocket
     // =========================
     pub use crate::ws;
-
-    pub use crate::ws::{WsManager};
+    pub use crate::ws::{WsService};
     
     // =========================
     // Responses
     // =========================
 
     pub use crate::res;
-
     pub use crate::res::{
         http_bad, http_bad_json, http_ok, http_ok_json, send_file, send_json, send_str, upload_file
     };
@@ -140,7 +129,6 @@ pub mod prelude {
     // =========================
 
     pub use crate::clean as cl;
-
     pub use crate::cl::{Rlt, Rsp, RltRsp, MainRlt, FileRlt, Rqs};
     
         
@@ -154,20 +142,13 @@ pub mod prelude {
     };
     
     // =========================
-    // Redis
+    // Utils
     // =========================
     pub use crate::utils;
-    pub use crate::{
-    utils::{
-        input,
-        generate_token,
-        index_file::{
-            index_file
-        },
-        config::{
-            app_config
-        }
-    }
+    pub use crate::utils::{
+        utils::{input, generate_token},
+        index_file::index_file,
+        config::app_config
     };
 
     // =========================

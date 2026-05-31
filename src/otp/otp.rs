@@ -13,60 +13,36 @@ pub struct OtpService {
 }
 
 impl OtpService {
-    /// Initializes the OTP service with the provided configuration
     pub fn new(config: OtpConfig) -> Self {
         Self { config }
     }
-
-    /// Generates an OTP, hashes it using the internal CryptoService, and stores it in Redis
     pub async fn generate_otp(&self, user_id: &str, digits: u32) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        // 1. Generate random digits
         let otp = Self::random_digits(digits);
-        
-        // 2. Hash the OTP using the internal CryptoService (using the secret as a salt)
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
-        let hash = self.config.crypto.sha256_hash(&content_to_hash).hash;
-
-        // 3. Save to Redis using the internal RedisManager with TTL
+        let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
         let redis_key = format!("otp:{}", user_id);
         self.config.redis.set_ttl(&redis_key, &hash, self.config.ttl_secs).await?;
-
         Ok(otp)
     }
-
-    /// Verifies the provided OTP against the stored hash and burns it on success
     pub async fn verify_otp(&self, user_id: &str, otp: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let redis_key = format!("otp:{}", user_id);
-
-        // 1. Fetch the stored hash from Redis
         let stored_hash: Option<String> = self.config.redis.get(&redis_key).await?;
-
         let hash_to_check = match stored_hash {
             Some(h) => h,
-            None => return Ok(false), // Expired or never existed
+            None => return Ok(false),
         };
-
-        // 2. Calculate the hash of the incoming OTP
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
-        let calculated_hash = self.config.crypto.sha256_hash(&content_to_hash).hash;
-
-        // 3. Verify
+        let calculated_hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
         let ok = calculated_hash == hash_to_check;
-
         if ok {
-            // 4. Burn after reading: delete it immediately upon successful verification
             self.config.redis.del(&redis_key).await?;
         }
-
         Ok(ok)
     }
-
-    /// Helper to generate mathematically secure random digits
     fn random_digits(digits: u32) -> String {
         let mut bytes = [0u8; 8];
         OsRng.fill_bytes(&mut bytes);
         let num = u64::from_le_bytes(bytes);
-
         let otp = num % 10u64.pow(digits);
         format!("{:0width$}", otp, width = digits as usize)
     }
