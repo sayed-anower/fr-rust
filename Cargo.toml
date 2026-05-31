@@ -54,6 +54,7 @@ redis = { version = "0.32", features = [
 "tokio-comp",
 "connection-manager",
 ] }
+deadpool-redis = "0.23"
 
 # Web Socket
 chrono = { version = "0.4", features = ["serde"] }
