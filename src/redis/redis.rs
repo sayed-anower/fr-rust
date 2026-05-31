@@ -1,12 +1,16 @@
 use redis::AsyncCommands;
 
 #[derive(Clone)]
-pub struct RedisManager;
+pub struct RedisManager {
+    // 1. Store the connection inside the manager
+    pub connection: redis::aio::MultiplexedConnection,
+}
 
 impl RedisManager {
-    pub async fn new(url: String) -> redis::RedisResult<redis::aio::MultiplexedConnection> {
-        let client = redis::Client::open(url).unwrap();
-        let mut con = client.get_multiplexed_async_connection().await?;
-        Ok(con)
+    // 2. Return Self instead of just the connection
+    pub async fn new(url: &str) -> redis::RedisResult<Self> {
+        let client = redis::Client::open(url)?;
+        let connection = client.get_multiplexed_async_connection().await?;
+        Ok(Self { connection })
     }
 }
