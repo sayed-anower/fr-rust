@@ -18,7 +18,7 @@ impl OtpService {
         Self { config }
     }
 
-    pub async fn generate_otp(&self, user_id: &str, digits: u32) -> anyhow::Result<String> {
+        pub async fn generate_otp(&self, user_id: &str, digits: u32) -> anyhow::Result<String> {
         let otp = Self::random_digits(digits);
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
         let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
@@ -26,8 +26,8 @@ impl OtpService {
         
         let mut con = self.config.redis.connection.clone();
         
-        // Added turbofish <_, _, ()> to specify the expected return type is ()
-        con.set_ex::<_, _, ()>(&redis_key, &hash, self.config.ttl_secs).await?;
+        // Explicitly annotate the unit type () on assignment to satisfy Edition 2024
+        let _res: () = con.set_ex(&redis_key, &hash, self.config.ttl_secs).await?;
         
         Ok(otp)
     }
@@ -48,8 +48,8 @@ impl OtpService {
         let ok = calculated_hash == hash_to_check;
         
         if ok {
-            // Added turbofish <_, ()> to specify the expected return type is ()
-            con.del::<_, ()>(&redis_key).await?;
+            // Explicitly annotate here as well
+            let _res: () = con.del(&redis_key).await?;
         }
         
         Ok(ok)
