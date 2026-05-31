@@ -260,9 +260,6 @@ let fast_hashing = crypto.sha256_hash("password").await.unwrap();
 ## 8. General Utilities
 Standalone utilities for CLI interactions and fast key generation.
 ```rust
-use std::io::{self, Write};
-use rand::RngCore;
-
 /// Captures user input directly from the terminal like python
 let name = input("What's your name!");
 
