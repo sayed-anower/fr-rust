@@ -8,7 +8,7 @@ pub struct RedisManager {
 
 impl RedisManager {
     // 2. Return Self instead of just the connection
-    pub async fn new(url: &str) -> redis::RedisResult<Self> {
+    pub async fn new(url: String) -> redis::RedisResult<Self> {
         let client = redis::Client::open(url)?;
         let connection = client.get_multiplexed_async_connection().await?;
         Ok(Self { connection })
