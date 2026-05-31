@@ -1,4 +1,4 @@
-use crate::prelude::{CryptoService, RedisManager};
+use crate::prelude::*;
 use rand::{rngs::OsRng, RngCore};
 
 pub struct OtpConfig {
