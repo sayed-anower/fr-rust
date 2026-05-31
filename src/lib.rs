@@ -107,7 +107,7 @@ pub mod prelude {
     // Config
     // =========================
 
-    pub use crate::utils::config::app_config;
+    // pub use crate::utils::config::app_config;
 
     // =========================
     // WebSocket
