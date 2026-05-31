@@ -48,7 +48,7 @@ async fn main() -> MainRlt {
         .window_secs(1)  // Window timeframe (1 second)
         .ban_duration_secs(20)
         .block_agent("malicious-bot")
-        .allow_missing_ua(false);
+        .allow_missing_ua(false).build();
 
     // --- Service Initialization ---
     // Email
@@ -66,13 +66,8 @@ async fn main() -> MainRlt {
     let pool = DbPool::new(env_var("DATABASE_URL"));
 
     // Redis
-    let redis_config = RedisConfig {
-        url: env_var("REDIS_URL"),
-        max_channels_per_pubsub: 2, 
-        flush_interval_ms: 100, 
-        pool_max_size: 3, 
-    };
-    let redis = RedisManager::new(redis_config).await.unwrap();
+    let redis_url = env_var("REDIS_URL");
+    let redis = RedisManager::new(redis_url).await.unwrap();
     
     // Crypto
     let key = env_var("AES_KEY");
@@ -194,7 +189,7 @@ async fn test_db(pool: AppData<DbPool>) -> Rsp {
 ## 5. Redis Integrations
 **fr-rust** features a fully-featured async Redis manager injected via web::Data<RedisManager>.
 ### Key Features
- * **Basic KV & TTL:** set, get, set_ttl, exists, ttl
+ * **Basic KV & TTL:** set, get, set_ex, exists, ttl
  * **Hashes:** hset, hget, hdel
  * **Lists:** lpush, rpush, lrange
  * **Sets:** sadd, smembers
@@ -206,15 +201,6 @@ async fn test_db(pool: AppData<DbPool>) -> Rsp {
 let fetch_action = || async { "Data From Database".to_string() };
 // Misses cache first time, hits cache second time
 let res = manager.cache_or_fetch("cache:item", 10, fetch_action).await?;
-
-```
-**Pub/Sub Example:**
-```rust
-manager.subscribe_json::<UserProfile, _>("events:users", |user| {
-    println!("Processed user event -> {}", user.username);
-}).await?;
-
-manager.publish("events:users", &test_user).await?;
 
 ```
 ## 6. Verification & Notification Services
@@ -264,6 +250,7 @@ async fn test_crypto(crypto: AppData<CryptoService>) -> Rsp {
     let decrypted = crypto.decrypt_text(&encrypted.encrypted_text).unwrap();
     
     let hashed = crypto.hash_data("password").await.unwrap();
+let fast_hashing = crypto.sha256_hash("password").await.unwrap();
     let is_valid = crypto.verify_hash("password", &hashed.hash).await.unwrap();
     
     http_ok("Crypto operations completed.")
@@ -276,23 +263,10 @@ Standalone utilities for CLI interactions and fast key generation.
 use std::io::{self, Write};
 use rand::RngCore;
 
-/// Captures user input directly from the terminal
-pub fn input(prompt: &str) -> String {
-    print!("{}", prompt);
-    io::stdout().flush().expect("Input flush failed!");
-    
-    let mut input_string = String::new();
-    io::stdin().read_line(&mut input_string).expect("Failed to read line");
-    
-    input_string.trim_end().to_string()
-}
+/// Captures user input directly from the terminal like python
+let name = input("What's your name!");
 
 /// Generates a random HEX encoded key of the given byte length
-pub fn generate_key(length: usize) -> String {
-    let num_bytes = length / 2;
-    let mut bytes = vec![0u8; num_bytes];
-    rand::thread_rng().fill_bytes(&mut bytes);
-    hex::encode(bytes)
-}
+let key = generate_key(100); // 100 length random key
 
 ```
