@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+
 use futures_util::StreamExt;
 use serde::{Serialize, de::DeserializeOwned};
 use tokio::sync::{broadcast, mpsc};
@@ -12,7 +13,7 @@ use redis::{Client, AsyncCommands, ErrorKind, RedisError};
 use deadpool_redis::{Pool, Config as DeadpoolConfig, PoolConfig, Runtime};
 
 /// =======================================================
-/// HIGH PERFORMANCE REDIS FRAMEWORK (FIXED)
+/// HIGH PERFORMANCE REDIS FRAMEWORK
 /// =======================================================
 
 #[derive(Debug, Clone)]
@@ -41,7 +42,7 @@ pub struct RedisManager {
 
 impl RedisManager {
     pub async fn new(config: RedisConfig) -> RedisResult<Self> {
-        let client = Client::open(&config.url)?;
+        let client = Client::open(config.url.as_str())?;
 
         let mut dp_cfg = DeadpoolConfig::from_url(&config.url);
         dp_cfg.pool = Some(PoolConfig {
@@ -244,7 +245,10 @@ impl RedisManager {
         for (k, v) in &data {
             pipe.set(*k, v);
         }
-        pipe.query_async::<_, Vec<redis::Value>>(&mut *conn).await.map(|_| ())
+        
+        // Fix: Explicitly declare the type and pass the un-dereferenced connection
+        let _: Vec<redis::Value> = pipe.query_async(&mut conn).await?;
+        Ok(())
     }
 
     // Cache Pattern
@@ -275,21 +279,27 @@ impl RedisManager {
 
     /// Fixed Race Condition & Guard Lifetimes
     pub async fn subscribe_channel(&self, channel: &str) -> broadcast::Receiver<String> {
-        let mut guard = self.local_channels.write().unwrap();
-        
-        match guard.entry(channel.to_string()) {
-            Entry::Occupied(entry) => entry.get().subscribe(),
-            Entry::Vacant(entry) => {
-                let (tx, rx) = broadcast::channel(1024);
-                entry.insert(tx);
-                
-                // Explicitly drop guard here so sub_tx async work doesn't extend lock lifetime
-                drop(guard); 
-                
-                let _ = self.sub_tx.send(channel.to_string()).await;
-                rx
+        // Fix: Execute the borrow inside a confined scope so the guard correctly drops
+        // before we reach the async/await `.send()` call.
+        let (rx, is_new) = {
+            let mut guard = self.local_channels.write().unwrap();
+            
+            match guard.entry(channel.to_string()) {
+                Entry::Occupied(entry) => (entry.get().subscribe(), false),
+                Entry::Vacant(entry) => {
+                    let (tx, rx) = broadcast::channel(1024);
+                    entry.insert(tx);
+                    (rx, true)
+                }
             }
+        };
+
+        // Guard is now dropped securely, Future remains Send
+        if is_new {
+            let _ = self.sub_tx.send(channel.to_string()).await;
         }
+        
+        rx
     }
 
     pub async fn subscribe<F>(&self, channel: &str, mut handler: F) -> RedisResult<()>
@@ -298,8 +308,13 @@ impl RedisManager {
     {
         let mut rx = self.subscribe_channel(channel).await;
         tokio::spawn(async move {
-            while let Ok(msg) = rx.recv().await {
-                handler(msg);
+            // Fix: Catch RecvError::Lagged to prevent silent exit
+            loop {
+                match rx.recv().await {
+                    Ok(msg) => handler(msg),
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
             }
         });
         Ok(())
@@ -312,16 +327,22 @@ impl RedisManager {
     {
         let mut rx = self.subscribe_channel(channel).await;
         tokio::spawn(async move {
-            while let Ok(msg) = rx.recv().await {
-                if let Ok(serde_str) = Self::deserialize::<String>(&msg) {
-                    if let Ok(data) = Self::deserialize::<T>(&serde_str) {
-                        handler(data);
-                        continue;
+            loop {
+                match rx.recv().await {
+                    Ok(msg) => {
+                        if let Ok(serde_str) = Self::deserialize::<String>(&msg) {
+                            if let Ok(data) = Self::deserialize::<T>(&serde_str) {
+                                handler(data);
+                                continue;
+                            }
+                        }
+                        // Fallback direct deserialize
+                        if let Ok(data) = Self::deserialize::<T>(&msg) {
+                            handler(data);
+                        }
                     }
-                }
-                // Fallback direct deserialize
-                if let Ok(data) = Self::deserialize::<T>(&msg) {
-                    handler(data);
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Closed) => break,
                 }
             }
         });
@@ -350,13 +371,14 @@ async fn pubsub_coordinator(
             Some(channel) = rx.recv() => {
                 pending.push(channel);
                 if pending.len() >= max_channels {
-                    let batch = std::mem::take(&mut pending);
+                    // Fix: Use replace instead of take to maintain capacity
+                    let batch = std::mem::replace(&mut pending, Vec::with_capacity(max_channels));
                     spawn_pubsub_worker(client.clone(), batch, local_channels.clone());
                 }
             }
             _ = interval.tick() => {
                 if !pending.is_empty() {
-                    let batch = std::mem::take(&mut pending);
+                    let batch = std::mem::replace(&mut pending, Vec::with_capacity(max_channels));
                     spawn_pubsub_worker(client.clone(), batch, local_channels.clone());
                 }
             }
