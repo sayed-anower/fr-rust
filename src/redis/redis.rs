@@ -9,8 +9,11 @@ use tokio::sync::{broadcast, mpsc};
 
 // Type aliases for cleaner code signatures
 pub type RedisResult<T> = Result<T, redis::RedisError>;
-use redis::{Client, AsyncCommands, ErrorKind, RedisError};
+use redis::{Client, ErrorKind, RedisError};
 use deadpool_redis::{Pool, Config as DeadpoolConfig, PoolConfig, Runtime};
+
+// This ensures the trait is implemented for deadpool_redis::Connection
+use deadpool_redis::redis::AsyncTypedCommands;
 
 /// =======================================================
 /// HIGH PERFORMANCE REDIS FRAMEWORK
@@ -133,7 +136,7 @@ impl RedisManager {
         T: Serialize,
     {
         let mut conn = self.conn().await?;
-        conn.set_ex(key, Self::serialize(value)?, ttl_seconds).await
+        conn.set_ex(key, Self::serialize(value)?, ttl_seconds as usize).await
     }
 
     pub async fn get<T>(&self, key: &str) -> RedisResult<Option<T>>
@@ -160,12 +163,13 @@ impl RedisManager {
 
     pub async fn expire(&self, key: &str, ttl_seconds: i64) -> RedisResult<()> {
         let mut conn = self.conn().await?;
-        conn.expire(key, ttl_seconds).await.map(|_| ())
+        conn.expire(key, ttl_seconds as usize).await.map(|_| ())
     }
 
     pub async fn ttl(&self, key: &str) -> RedisResult<i64> {
         let mut conn = self.conn().await?;
-        conn.ttl(key).await
+        let ttl: i64 = conn.ttl(key).await?;
+        Ok(ttl)
     }
 
     // Hash Map Actions
