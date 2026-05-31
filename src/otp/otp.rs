@@ -21,7 +21,7 @@ impl OtpService {
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
         let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
         let redis_key = format!("otp:{}", user_id);
-        self.config.redis.set_ttl(&redis_key, &hash, self.config.ttl_secs).await?;
+        self.config.redis.set_ex(&redis_key, &hash, self.config.ttl_secs).await?;
         Ok(otp)
     }
     pub async fn verify_otp(&self, user_id: &str, otp: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
