@@ -17,7 +17,7 @@ impl LinkV {
         Self { config }
     }
 
-    pub async fn generate_token(&self, user_id: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn generate_token(&self, user_id: &str) -> anyhow::Result<String> {
         let mut token_bytes = vec![0u8; 256];
         rand::thread_rng().fill_bytes(&mut token_bytes);
         let token = hex::encode(token_bytes);
@@ -25,7 +25,7 @@ impl LinkV {
         self.config.redis.set_ex(&redis_key, "1", self.config.ttl_secs).await?;
         Ok(token)
     }
-    pub async fn verify_token(&self, user_id: &str, token: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn verify_token(&self, user_id: &str, token: &str) -> anyhow::Result<bool> {
         let redis_key = format!("linkv:verify:{}:{}", user_id, token);
         let is_valid = self.config.redis.exists(&redis_key).await?;
         if is_valid {
