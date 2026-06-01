@@ -24,7 +24,7 @@ impl OtpService {
         let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
         let redis_key = format!("otp:{}", user_id);
         
-        let mut con = self.config.redis.connection.clone();
+        let mut con = self.config.redis.get_connection().await?;
         
         // Explicitly annotate the unit type () on assignment to satisfy Edition 2024
         let _res: () = con.set_ex(&redis_key, &hash, self.config.ttl_secs).await?;
@@ -35,7 +35,7 @@ impl OtpService {
     pub async fn verify_otp(&self, user_id: &str, otp: &str) -> anyhow::Result<bool> {
         let redis_key = format!("otp:{}", user_id);
         
-        let mut con = self.config.redis.connection.clone();
+        let mut con = self.config.redis.get_connection().await?;
         let stored_hash: Option<String> = con.get(&redis_key).await?;
         
         let hash_to_check = match stored_hash {

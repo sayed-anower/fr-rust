@@ -1,16 +1,23 @@
-use redis::AsyncCommands;
+use deadpool_redis::{Config, Runtime, Connection, Pool};
+use deadpool_redis::redis::AsyncCommands;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct RedisManager {
-    // 1. Store the connection inside the manager
-    pub connection: redis::aio::MultiplexedConnection,
+    pool: Pool,
 }
 
 impl RedisManager {
-    // 2. Return Self instead of just the connection
-    pub async fn new(url: String) -> redis::RedisResult<Self> {
-        let client = redis::Client::open(url)?;
-        let connection = client.get_multiplexed_async_connection().await?;
-        Ok(Self { connection })
+    pub fn new(url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let cfg = Config::from_url(url)?;
+        
+        let pool = cfg.create_pool(Some(Runtime::Tokio1))?;
+        
+        Ok(RedisManager { pool })
+    }
+
+    pub async fn get_connection(&self) -> Result<Connection, Box<dyn std::error::Error>> {
+        let conn = self.pool.get().await?;
+        Ok(conn)
     }
 }

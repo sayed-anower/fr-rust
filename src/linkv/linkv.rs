@@ -23,7 +23,7 @@ impl LinkV {
         let token = hex::encode(token_bytes);
         let redis_key = format!("linkv:verify:{}:{}", user_id, token);
         
-        let mut con = self.config.redis.connection.clone();
+        let mut con = self.config.get_connection().await?;
         
         // Force the type system to register the output as ()
         let _res: () = con.set_ex(&redis_key, "1", self.config.ttl_secs).await?;
@@ -34,7 +34,7 @@ impl LinkV {
     pub async fn verify_token(&self, user_id: &str, token: &str) -> anyhow::Result<bool> {
         let redis_key = format!("linkv:verify:{}:{}", user_id, token);
         
-        let mut con = self.config.redis.connection.clone();
+        let mut con = self.config.redis.get_connection().await?;
         let is_valid: bool = con.exists(&redis_key).await?;
         
         if is_valid {
