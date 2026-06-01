@@ -112,7 +112,7 @@ pub mod prelude {
     // pub use crate::utils::config::app_config;
 
     // =========================
-    // WebSocket
+    // JWT Token
     // =========================
     pub use crate::jwt;
     pub use crate::jwt::jwt::{Jwt};
