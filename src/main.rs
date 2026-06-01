@@ -59,7 +59,7 @@ async fn main() -> MainRlt {
         server: 1,
         redis: redis.clone()
     };
-    let ws = WsService::new(ws_config);
+    let ws = WsManager::new(ws_config);
     /* IP & PORTS */
     let ip = env_var_or_default("IP", "0.0.0.0");
     let port = env_var_or_default("PORT", "8080");
