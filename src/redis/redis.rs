@@ -29,14 +29,20 @@ impl RedisManager {
         Ok(conn)
     }
 
-    pub async fn publish(&self, event_name: &str, content: &str) -> redis::RedisResult<()> {
-        let mut conn = self.pool.get().await
-            // FIXED: Changed ErrorKind::IoError to ErrorKind::ClientError
-            .map_err(|e| redis::RedisError::from((redis::ErrorKind::ClientError, "Pool error", e.to_string())))?;
 
-        conn.publish::<_, _, ()>(event_name, content).await?;
-        Ok(())
-    }
+pub async fn publish(&self, event_name: &str, content: &str) -> redis::RedisResult<()> {
+    let mut conn = self.pool.get().await
+        .map_err(|e| {
+            redis::RedisError::from((
+                redis::ErrorKind::ResponseError, 
+                "Pool error", 
+                e.to_string()
+            ))
+        })?;
+
+    conn.publish::<_, _, ()>(event_name, content).await?;
+    Ok(())
+}
 
     // FIXED: Changed return type signature to `redis::aio::PubSubStream` 
     pub async fn subscribe(&self, event_name: &str) -> anyhow::Result<redis::aio::PubSubStream> {
