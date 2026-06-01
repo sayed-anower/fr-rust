@@ -46,7 +46,7 @@ pub mod prelude {
     pub use actix_multipart::{
         Multipart
     };
-    pub use ::redis::AsyncCommands;
+//    pub use ::redis::AsyncCommands;
     pub use deadpool_redis;
     
     // =========================
