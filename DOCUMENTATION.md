@@ -13,18 +13,6 @@ To access all framework features, include the prelude in your files:
 use fr_rust::prelude::*;
 
 ```
-### 1.1 Environment Variables
-To utilize all services fully, ensure the following variables are defined in your .env file:
-| Variable | Description |
-|---|---|
-| IP, PORT | Server binding address (defaults to 0.0.0.0:8080) |
-| DATABASE_URL | Connection string for your database pool |
-| REDIS_URL | Connection string for Redis cache/pubsub |
-| AES_KEY | 32-byte encryption key for CryptoService |
-| KEY | Secret key used for OTP and Link Verification |
-| SMTP_HOST, SMTP_PORT | SMTP server routing details |
-| SMTP_USER, SMTP_PASS | SMTP authentication credentials |
-| FROM_NAME, FROM_EMAIL | Sender details for the EmailService |
 ## 2. Server Configuration (main.rs)
 The entry point of your application sets up all shared states, middleware, and dependency injections.
 ```rust
@@ -48,7 +36,8 @@ async fn main() -> MainRlt {
         .window_secs(1)  // Window timeframe (1 second)
         .ban_duration_secs(20)
         .block_agent("malicious-bot")
-        .allow_missing_ua(false).build();
+        .allow_missing_ua(false)
+        .build();
 
     // --- Service Initialization ---
     // Email
@@ -92,7 +81,7 @@ async fn main() -> MainRlt {
     let linkv_service = LinkV::new(linkv_config);
     
     // WebSockets
-    let ws = WsService::new(redis.clone(), pool.clone()); 
+    let ws = WsManager::new(redis.clone(), pool.clone()); 
 
     // --- Server Boot ---
     let ip = env_var_or_default("IP", "0.0.0.0");
@@ -196,12 +185,18 @@ async fn test_db(pool: AppData<DbPool>) -> Rsp {
  * **Pipelines:** Execute multiple commands efficiently via pipeline_set
  * **Cache-Aside Pattern:** cache_or_fetch automatically fetches from DB on cache miss.
  * **Pub/Sub:** Coordinated batched pub/sub for strings and JSON payloads.
-**Cache-Aside Example:**
+**Pub/Sub Example:**
 ```rust
-let fetch_action = || async { "Data From Database".to_string() };
-// Misses cache first time, hits cache second time
-let res = manager.cache_or_fetch("cache:item", 10, fetch_action).await?;
+// Pub
+redis.publish("event_name", "content").await.unwrap();
+// Sub
+let mut stream = redis.subscribe(event_name).await?;
+    
+while let Some(msg) = stream.next().await {
+    let payload: String =     msg.get_payload()?;
+    println!("Received: {}", payload);
 
+}
 ```
 ## 6. Verification & Notification Services
 ### 6.1 Email Service
@@ -215,7 +210,7 @@ async fn test_email(email_service: web::Data<EmailService>) -> Rsp {
         body: "Mail body here.".to_string(),
     };
     
-    match email_service.send_email(config, data) {
+    match email_service.send_email(config, data).await.unwrap() {
         Ok(_) => http_ok("Sent!"),
         Err(_) => http_bad("Failed."),
     }
@@ -267,3 +262,4 @@ let name = input("What's your name!");
 let key = generate_key(100); // 100 length random key
 
 ```
+

@@ -1,18 +1,44 @@
 use deadpool_redis::{Config, Runtime, Connection, Pool};
-use deadpool_redis::redis::AsyncCommands;
+use redis::AsyncCommands;
+use futures_util::StreamExt;
+use redis::Client;
 
-impl RedisManager {
-   
-    pub fn new(url: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let cfg = Config::from_url(url).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-        let pool = cfg.create_pool(Some(Runtime::Tokio1)).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-        Ok(RedisManager { pool })
-    }
-
-  
-    pub async fn get_connection(&self) -> Result<Connection, Box<dyn std::error::Error + Send + Sync>> {
-        let conn = self.pool.get().await.map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-        Ok(conn)
-    }
+#[derive(Clone)]
+pub struct RedisManager {
+    url: String,
+    pool: Pool,
 }
 
+impl RedisManager {
+    pub fn new(url: &str) -> anyhow::Result<Self> {
+        let cfg = Config::from_url(url);
+        let pool = cfg.create_pool(Some(Runtime::Tokio1))?;
+        
+        Ok(RedisManager { 
+            url: url.to_string(), 
+            pool 
+        })
+    }
+
+    pub async fn get_connection(&self) -> anyhow::Result<Connection> {
+        let conn = self.pool.get().await?;
+        Ok(conn)
+    }
+
+    pub async fn publish(&self, event_name: &str, content: &str) -> redis::RedisResult<()> {
+        let mut conn = self.pool.get().await
+            .map_err(|e| redis::RedisError::from((redis::ErrorKind::IoError, "Pool error", e.to_string())))?;
+        
+        conn.publish::<_, _, ()>(event_name, content).await?;
+        Ok(())
+    }
+    
+    pub async fn subscribe(&self, event_name: &str) -> anyhow::Result<redis::PubSubStream> {
+        let client = Client::open(self.url.as_str())?;
+        let mut pubsub = client.get_async_pubsub().await?;
+        
+        pubsub.subscribe(event_name).await?;
+        
+        Ok(pubsub.into_on_message())
+    }
+}

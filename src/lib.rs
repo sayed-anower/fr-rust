@@ -47,6 +47,7 @@ pub mod prelude {
         Multipart
     };
     pub use ::redis::AsyncCommands;
+    pub use deadpool_redis;
     
     // =========================
     // Actix Web
@@ -169,3 +170,4 @@ pub mod prelude {
         DdosShield
     };
 }
+
