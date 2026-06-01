@@ -115,7 +115,7 @@ pub mod prelude {
     // JWT Token
     // =========================
     pub use crate::jwt;
-    pub use crate::jwt::jwt::{Jwt};
+    pub use crate::jwt::{Jwt};
     
     // =========================
     // Responses
