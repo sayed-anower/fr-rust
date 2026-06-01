@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use rand::RngCore;
-use ::redis::AsyncCommands; // Fixed ambiguity with leading `::`
+use deadpool_redis::redis::AsyncCommands; 
 #[derive(Clone)]
 pub struct LinkVConfig {
     pub secret: String,

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use rand::{rngs::OsRng, RngCore};
-use ::redis::AsyncCommands; // Fixed ambiguity with leading `::`
+use deadpool_redis::redis::AsyncCommands;
 #[derive(Clone)]
 pub struct OtpConfig {
     pub secret: String,
