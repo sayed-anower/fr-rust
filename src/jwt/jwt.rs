@@ -8,6 +8,7 @@ struct Claims {
     exp: Option<usize>,
 }
 
+#[derive(Clone)]
 pub struct Jwt;
 
 impl Jwt {
@@ -58,4 +59,3 @@ impl Jwt {
         result.is_ok()
     }
 }
-
