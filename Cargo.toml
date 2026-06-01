@@ -46,15 +46,7 @@ lettre = { version = "0.11.22", default-features = false, features = [
     "tokio1-rustls"
 ] }
 
-# For safety
-openssl-sys = { version = "0.9", features = ["vendored"] }
-
 # Redis
-redis = { version = "0.32", features = [
-    "tokio-comp",
-    "connection-manager",
-    "aio",
-] }
 deadpool-redis = "0.23"
 
 # Web Socket

@@ -1,7 +1,10 @@
 use deadpool_redis::{Config, Runtime, Connection, Pool};
-use redis::AsyncCommands;
+
+use deadpool_redis::redis;
+use deadpool_redis::redis::AsyncCommands;
+use deadpool_redis::redis::Client;
+
 use futures_util::StreamExt;
-use redis::Client;
 
 #[derive(Clone)]
 pub struct RedisManager {
@@ -33,7 +36,7 @@ impl RedisManager {
         Ok(())
     }
     
-    pub async fn subscribe(&self, event_name: &str) -> anyhow::Result<redis::PubSubStream> {
+    pub async fn subscribe(&self, event_name: &str) -> anyhow::Result<redis::aio::PubSub> {
         let client = Client::open(self.url.as_str())?;
         let mut pubsub = client.get_async_pubsub().await?;
         
