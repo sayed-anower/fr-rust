@@ -14,6 +14,8 @@ async fn main() -> MainRlt {
         .block_agent("malicious-bot")
         .allow_missing_ua(false)
         .build();
+    // JWT
+    let jwt = Jwt::new();
     // Email
     let email_config = EmailConfig {
         smtp_host: env_var("SMTP_HOST"),
@@ -67,7 +69,7 @@ async fn main() -> MainRlt {
     .app_data(AppData::new(crypto_service.clone()))
     .app_data(AppData::new(otp_service.clone()))
     .app_data(AppData::new(linkv_service.clone()))
-    // .app_data(AppData::new(ws.clone()))
+    .app_data(AppData::new(jwt.clone()))
     .configure(app_config)
     .wrap(ddos_shield.clone())
     ).bind(address)?.run().await

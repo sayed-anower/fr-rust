@@ -8,7 +8,7 @@ pub mod otp;
 pub mod res;
 pub mod server;
 pub mod utils;
-// pub mod ws;
+pub mod jwt;
 pub mod redis;
 pub mod linkv;
 pub mod ddos;
@@ -114,8 +114,8 @@ pub mod prelude {
     // =========================
     // WebSocket
     // =========================
-    // pub use crate::ws;
-    // pub use crate::ws::{WsService};
+    pub use crate::jwt;
+    pub use crate::jwt::{Jwt};
     
     // =========================
     // Responses

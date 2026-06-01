@@ -38,7 +38,8 @@ async fn main() -> MainRlt {
         .block_agent("malicious-bot")
         .allow_missing_ua(false)
         .build();
-
+    // jwt
+    let jwt = Jwt::new();
     // --- Service Initialization ---
     // Email
     let email_config = EmailConfig {
@@ -97,7 +98,7 @@ async fn main() -> MainRlt {
         .app_data(AppData::new(crypto_service.clone()))
         .app_data(AppData::new(otp_service.clone()))
         .app_data(AppData::new(linkv_service.clone()))
-        .app_data(AppData::new(ws.clone()))
+        .app_data(AppData::new(jwt.clone()))
         .configure(app_config)
         .wrap(ddos_shield.clone())
     )
@@ -182,8 +183,6 @@ async fn test_db(pool: AppData<DbPool>) -> Rsp {
  * **Hashes:** hset, hget, hdel
  * **Lists:** lpush, rpush, lrange
  * **Sets:** sadd, smembers
- * **Pipelines:** Execute multiple commands efficiently via pipeline_set
- * **Cache-Aside Pattern:** cache_or_fetch automatically fetches from DB on cache miss.
  * **Pub/Sub:** Coordinated batched pub/sub for strings and JSON payloads.
 **Pub/Sub Example:**
 ```rust
@@ -232,6 +231,26 @@ if linkv_service.verify_token("user123", &token) {
     http_ok("Valid Token!")
 }
 
+```
+### 6.4 JWT Token
+```rust
+let secret = "my_ultra_secure_secret_key_2026";
+
+let user_id = "user_12345";
+
+// Generate a standard token with no expiration claim
+let forever_token = jwt.generate_token(user_id, secret).unwrap();
+
+// Set token to expire exactly 2 seconds from now
+let expiry_timestamp = current_time + 2; 
+
+let expiring_token = jwt.generate_exp_token(user_id, secret, expiry_timestamp).unwrap();
+
+// Verify it immediately
+let is_valid_now = jwt.verify_token(&forever_token, secret); // true/false
+
+// Get current Unix timestamp
+let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as usize;
 ```
 ## 7. Cryptography Service
 Inject AppData<CryptoService> to safely encrypt data or hash passwords.

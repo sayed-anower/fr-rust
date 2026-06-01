@@ -15,6 +15,7 @@ FR-RUST comes pre-packaged with out-of-the-box batteries to accelerate your back
 - **Built-in Email Service:** Seamlessly connect and dispatch transactional emails.
 - **OTP Service:** Native generation and lifecycle management for One-Time Passwords.
 - **Link Verification Service:** Secure email-based link verification featuring custom validity time expiration windows.
+- **JWT Framework:** Plug-and-play JSON Web Token generation, custom expiration windows, and automatic cryptographic verification out of the box.
 - **DDoS Protection:** Enterprise-grade, modern rate-limiting and traffic-shaping guardrails to intercept and mitigate distributed attacks.
 - **Advanced DB Management:** Simplified PostgreSQL/Database connection pooling and queries.
 - **Crypto & Security Suite:** Effortless AES text encryption/decryption and hashing operations.
