@@ -27,5 +27,4 @@ FR-RUST comes pre-packaged with out-of-the-box batteries to accelerate your back
 
 ## ⚠️ Architectural Considerations
 
-- **WebSocket Clustering:** Currently, WebSockets operate in-memory on a single node and do not natively sync across multi-server setups out-of-the-box. However, a single node is highly optimized and capable of handling millions of concurrent actions/users per second.
 - **Opinionated Control:** To offer maximum developer velocity and an effortless learning curve, some low-level configurations are abstracted. Advanced users might occasionally feel a slight loss of granular underlying control compared to raw Actix.

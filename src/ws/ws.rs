@@ -55,7 +55,8 @@ impl WsManager {
     pub async fn register(&self, uid: &str, tx: mpsc::Sender<String>) -> anyhow::Result<()> {
         let mut conn = self.redis.get_connection().await?;
 
-        conn.set(format!("user:{}", uid), self.server.to_string()).await?;
+        // Fixed: Added explicit () return type via turbofish
+        conn.set::<_, _, ()>(format!("user:{}", uid), self.server.to_string()).await?;
 
         self.local_sessions.insert(uid.to_string(), tx);
         Ok(())
@@ -64,14 +65,16 @@ impl WsManager {
     // 3. "create_room" create new room in redis
     pub async fn create_room(&self, room_name: &str) -> anyhow::Result<()> {
         let mut conn = self.redis.get_connection().await?;
-        conn.set(format!("room_exists:{}", room_name), "1").await?;
+        // Fixed: Added explicit () return type via turbofish
+        conn.set::<_, _, ()>(format!("room_exists:{}", room_name), "1").await?;
         Ok(())
     }
 
     // 4. "join_room" add new user_id to room users.
     pub async fn join_room(&self, room_name: &str, uid: &str) -> Result<()> {
         let mut conn = self.redis.get_connection().await?;
-        conn.sadd(format!("room:{}", room_name), uid).await?;
+        // Fixed: Added explicit () return type via turbofish
+        conn.sadd::<_, _, ()>(format!("room:{}", room_name), uid).await?;
         Ok(())
     }
 
@@ -80,8 +83,8 @@ impl WsManager {
         let mut conn = self.redis.get_connection().await?;
         let msg_str = serde_json::to_string(&msg_obj)?;
 
-        // Save message to room history (Redis List using RPUSH)
-        conn.rpush(format!("room_msgs:{}", room_name), &msg_str).await?;
+        // Fixed: Added explicit () return type via turbofish
+        conn.rpush::<_, _, ()>(format!("room_msgs:{}", room_name), &msg_str).await?;
 
         // Get all users in the room
         let users: Vec<String> = conn.smembers(format!("room:{}", room_name)).await?;
@@ -117,7 +120,8 @@ impl WsManager {
                     "msg": msg
                 }).to_string();
                 
-                conn.publish("fr-ws", payload).await?;
+                // Fixed: Added explicit () return type via turbofish
+                conn.publish::<_, _, ()>("fr-ws", payload).await?;
             }
         }
         Ok(())
@@ -126,7 +130,8 @@ impl WsManager {
     // 7. "drop_user" remove user from redis and local sessions
     pub async fn drop_user(&self, uid: &str) -> Result<()> {
         let mut conn = self.redis.get_connection().await?;
-        conn.del(format!("user:{}", uid)).await?;
+        // Fixed: Added explicit () return type via turbofish
+        conn.del::<_, ()>(format!("user:{}", uid)).await?;
         self.local_sessions.remove(uid);
         Ok(())
     }
@@ -134,9 +139,10 @@ impl WsManager {
     // 8. "drop_room" remove room and messages from redis
     pub async fn drop_room(&self, room_name: &str) -> Result<()> {
         let mut conn = self.redis.get_connection().await?;
-        conn.del(format!("room:{}", room_name)).await?;
-        conn.del(format!("room_msgs:{}", room_name)).await?;
-        conn.del(format!("room_exists:{}", room_name)).await?;
+        // Fixed: Added explicit () return type via turbofish for all del calls
+        conn.del::<_, ()>(format!("room:{}", room_name)).await?;
+        conn.del::<_, ()>(format!("room_msgs:{}", room_name)).await?;
+        conn.del::<_, ()>(format!("room_exists:{}", room_name)).await?;
         Ok(())
     }
 
@@ -145,7 +151,8 @@ impl WsManager {
         let mut conn = self.redis.get_connection().await?;
         
         // 1. Publish to the global broadcast channel so ALL servers get it
-        conn.publish("fr-ws-broadcast", &msg).await?;
+        // Fixed: Added explicit () return type via turbofish
+        conn.publish::<_, _, ()>("fr-ws-broadcast", &msg).await?;
         
         // 2. Send to all users connected to THIS local server immediately
         for entry in self.local_sessions.iter() {

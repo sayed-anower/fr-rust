@@ -282,3 +282,4 @@ let key = generate_key(100); // 100 length random key
 
 ```
 
+### Web socket will be added here...
