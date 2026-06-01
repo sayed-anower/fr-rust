@@ -52,23 +52,18 @@ impl WsManager {
     }
 
     // 2. "register" save new in redis: user_id: server
-    pub async fn register(&self, uid: &str, tx: mpsc::Sender<String>) -> Result<()> {
+    pub async fn register(&self, uid: &str, tx: mpsc::Sender<String>) -> anyhow::Result<()> {
         let mut conn = self.redis.get_connection().await?;
-        
-        // Save to Redis (using a string key "user:{uid}") containing just the server id
+
         conn.set(format!("user:{}", uid), self.server.to_string()).await?;
-        
-        // Save connection locally so we can push messages to it
+
         self.local_sessions.insert(uid.to_string(), tx);
         Ok(())
     }
 
     // 3. "create_room" create new room in redis
-    pub async fn create_room(&self, room_name: &str) -> Result<()> {
-        // Redis sets create automatically when you add members. 
-        // We can just initialize an empty key or acknowledge it exists.
+    pub async fn create_room(&self, room_name: &str) -> anyhow::Result<()> {
         let mut conn = self.redis.get_connection().await?;
-        // Just setting a dummy key to mark room existence if needed
         conn.set(format!("room_exists:{}", room_name), "1").await?;
         Ok(())
     }
@@ -76,7 +71,6 @@ impl WsManager {
     // 4. "join_room" add new user_id to room users.
     pub async fn join_room(&self, room_name: &str, uid: &str) -> Result<()> {
         let mut conn = self.redis.get_connection().await?;
-        // Using Redis SET (SADD) to store unique users in a room
         conn.sadd(format!("room:{}", room_name), uid).await?;
         Ok(())
     }
@@ -101,7 +95,7 @@ impl WsManager {
     }
 
     // 6. "msg_user" take user id, check server match -> send locally OR publish
-    pub async fn msg_user(&self, uid: &str, msg: String) -> Result<()> {
+    pub async fn msg_user(&self, uid: &str, msg: String) -> anyhow::Result<()> {
         let mut conn = self.redis.get_connection().await?;
         
         // Fetch user server data from Redis
@@ -126,7 +120,6 @@ impl WsManager {
                 conn.publish("fr-ws", payload).await?;
             }
         }
-        // If user doesn't exist, function simply ignores (returns Ok)
         Ok(())
     }
 
@@ -164,7 +157,6 @@ impl WsManager {
     // 10. "get_room_msgs" get all msgs that exist in room_name
     pub async fn get_room_msgs(&self, room_name: &str) -> Result<Vec<UserMsg>> {
         let mut conn = self.redis.get_connection().await?;
-        // Fetch all items in the list (LRANGE 0 -1)
         let msgs_str: Vec<String> = conn.lrange(format!("room_msgs:{}", room_name), 0, -1).await?;
         
         let mut msgs = Vec::new();

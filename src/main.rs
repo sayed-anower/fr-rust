@@ -55,7 +55,11 @@ async fn main() -> MainRlt {
     };
     let linkv_service = LinkV::new(linkv_config);
     // Web Socket
-    //let ws = WsService::new(redis.clone(), pool.clone()); // Web Socket has errors.
+    let ws_config = WsConfig {
+        server: 1,
+        redis: redis.clone()
+    };
+    let ws = WsService::new(ws_config);
     /* IP & PORTS */
     let ip = env_var_or_default("IP", "0.0.0.0");
     let port = env_var_or_default("PORT", "8080");
@@ -70,6 +74,7 @@ async fn main() -> MainRlt {
     .app_data(AppData::new(otp_service.clone()))
     .app_data(AppData::new(linkv_service.clone()))
     .app_data(AppData::new(jwt.clone()))
+    .app_data(AppData::new(ws.clone()))
     .configure(app_config)
     .wrap(ddos_shield.clone())
     ).bind(address)?.run().await
