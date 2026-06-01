@@ -9,7 +9,7 @@ pub struct RedisManager {
 
 impl RedisManager {
     pub fn new(url: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let cfg = Config::from_url(url)?;
+        let cfg = Config::from_url(url).unwrap();
         
         let pool = cfg.create_pool(Some(Runtime::Tokio1))?;
         
@@ -17,7 +17,7 @@ impl RedisManager {
     }
 
     pub async fn get_connection(&self) -> Result<Connection, Box<dyn std::error::Error>> {
-        let conn = self.pool.get().await?;
+        let conn = self.pool.get().await.unwrap();
         Ok(conn)
     }
 }
