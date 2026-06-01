@@ -12,6 +12,7 @@ pub mod jwt;
 pub mod redis;
 pub mod linkv;
 pub mod ddos;
+pub mod ws;
 
 // Feels easy
 pub mod prelude {
@@ -46,7 +47,7 @@ pub mod prelude {
     pub use actix_multipart::{
         Multipart
     };
-//    pub use ::redis::AsyncCommands;
+
     pub use deadpool_redis;
     
     // =========================
@@ -106,10 +107,11 @@ pub mod prelude {
     pub use crate::db::{DbPool};
 
     // =========================
-    // Config
+    // Web Socket
     // =========================
 
-    // pub use crate::utils::config::app_config;
+    pub use crate::ws;
+    pub use crate::ws::{WsManager, WsConfig, UserMsg};
 
     // =========================
     // JWT Token
