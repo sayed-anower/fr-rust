@@ -30,19 +30,12 @@ impl RedisManager {
     }
 
 
-pub async fn publish(&self, event_name: &str, content: &str) -> redis::RedisResult<()> {
-    let mut conn = self.pool.get().await
-        .map_err(|e| {
-            redis::RedisError::from((
-                redis::ErrorKind::ResponseError, 
-                "Pool error", 
-                e.to_string()
-            ))
-        })?;
+   pub async fn publish(&self, event_name: &str, content: &str) -> anyhow::Result<()> {
+      let mut conn = self.pool.get().await?;
 
-    conn.publish::<_, _, ()>(event_name, content).await?;
-    Ok(())
-}
+      conn.publish::<_, _, ()>(event_name, content).await?;
+      Ok(())
+   }
 
     // FIXED: Changed return type signature to `redis::aio::PubSubStream` 
     pub async fn subscribe(&self, event_name: &str) -> anyhow::Result<redis::aio::PubSubStream> {

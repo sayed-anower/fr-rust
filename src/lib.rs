@@ -115,7 +115,7 @@ pub mod prelude {
     // WebSocket
     // =========================
     pub use crate::jwt;
-    pub use crate::jwt::{Jwt};
+    pub use crate::jwt::jwt::{Jwt};
     
     // =========================
     // Responses
