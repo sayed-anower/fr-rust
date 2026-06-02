@@ -137,10 +137,10 @@ pub mod prelude {
     };
 
     #[cfg(feature = "server")]
-    pub use crate::server::{self, env_var, env_var_or_default, init_env};
+    pub use crate::server::{self, env_var, env_var_or_default, load_env};
 
     #[cfg(feature = "types")]
-    pub use crate::types::{self, FileRlt, MainRlt, Rlt, RltRsp, Rps, Rqs};
+    pub use crate::types::{self, FileRlt, MainRlt, Rlt, RltRsp, Rsp, Rqs};
 
     #[cfg(feature = "ws")]
     pub use crate::ws::{self, UserMsg, WsConfig, WsManager};

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use deadpool_redis::redis::AsyncCommands;
-use anyhow::{Context, Result};
+use anyhow::{Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
