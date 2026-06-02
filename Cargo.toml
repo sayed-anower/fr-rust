@@ -41,7 +41,7 @@ utils = []
 # Required / Core Utilities (Always compiled)
 tokio = { version = "1.40", features = ["full"] }
 anyhow = "1.0"
-dashmap = "6.1"
+dashmap = "6.2"
 dotenvy = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -52,7 +52,7 @@ tracing = "0.1"
 async-trait = "0.1"
 
 # Actix/Web (Optional via 'web' or 'ws' features)
-actix-web = { version = "4.13.0", optional = true }
+actix-web = { version = "4.13", optional = true }
 actix-ws = { version = "0.3", optional = true }
 actix-files = { version = "0.6", optional = true }
 actix-multipart = { version = "0.6", optional = true }
@@ -63,15 +63,16 @@ tokio-postgres = { version = "0.7", optional = true }
 deadpool-postgres = { version = "0.14", optional = true }
 
 # Security & Crypto (Optional via 'crypto' or 'otp' features)
-argon2 = { version = "0.5", optional = true }
+argon2 = { version = "0.5.3", optional = true }
 aes-gcm = { version = "0.10", optional = true }
 hmac = { version = "0.12", optional = true }
 sha2 = { version = "0.10", optional = true }
 rand = { version = "0.8", optional = true }
 
 # JWT (Optional via 'jwt' feature)
-jsonwebtoken = { version = "9", optional = true }
-uuid = { version = "1.10", features = ["v4", "serde"] } # Kept as core utility for general app use
+# Note: jsonwebtoken v10 requires an explicit crypto backend feature (e.g., "aws_lc_rs" or "rust_crypto")
+jsonwebtoken = { version = "10", features = ["aws_lc_rs"], optional = true }
+uuid = { version = "1.23", features = ["v4", "serde"] } # Kept as core utility for general app use
 
 # Email (Optional via 'email' feature)
 lettre = { version = "0.11.22", default-features = false, features = ["tokio1", "smtp-transport", "builder", "rustls-tls", "tokio1-rustls"], optional = true }
