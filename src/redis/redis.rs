@@ -4,9 +4,6 @@ use deadpool_redis::redis;
 use deadpool_redis::redis::AsyncCommands;
 use deadpool_redis::redis::Client;
 
-// 1. Ensure you import StreamExt if you end up reading from the stream
-use futures_util::StreamExt as _;
-
 #[derive(Clone)]
 pub struct RedisManager {
     url: String,

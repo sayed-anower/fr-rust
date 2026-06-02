@@ -8,8 +8,8 @@ license = "MIT"
 repository = "https://github.com/sayed-anower/fr-rust"
 documentation = "https://docs.rs/fr-rust"
 readme = "DOCUMENTATION.md"
-keywords = ["web", "websocket", "backend", "web-backend"]
-categories = ["web-programming", "web"]
+keywords = ["web", "websocket", "backend", "framework"]
+categories = ["web-programming", "asynchronous"]
 
 [features]
 # Web and core features loaded by default. 
