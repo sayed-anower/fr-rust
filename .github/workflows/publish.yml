@@ -4,7 +4,7 @@ on:
   push:
     # This triggers the workflow only when a tag starting with 'v' is pushed
     tags:
-      - 'v*'
+      - 'v0.1.0'
 
 env:
   CARGO_TERM_COLOR: always
