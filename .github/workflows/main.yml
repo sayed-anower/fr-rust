@@ -1,0 +1,32 @@
+name: Publish to crates.io
+
+on:
+  push:
+    # Fixed: Now triggers on any version tag (v0.1.0, v0.1.1, etc.)
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish Crate
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Run tests (Safety check)
+      run: cargo test --all-features --verbose
+
+    - name: Verify package layout and validity
+      run: cargo package --verbose
+
+    - name: Publish to crates.io
+      # Fixed: Ensuring this matches whatever you named your GitHub Secret
+      run: cargo publish --token ${{ secrets.IO_TOKEN }}
