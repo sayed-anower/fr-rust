@@ -1,6 +1,6 @@
 [package]
 name = "fr-rust"
-version = "0.1.1"
+version = "0.1.0"
 edition = "2024"
 authors = ["Sayed Anower <sayed.anower.17.2@gmail.com>"]
 description = "A comprehensive framework/utility library for Actix-web, Postgres, Redis, and authentication."
