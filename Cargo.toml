@@ -8,7 +8,7 @@ license = "MIT"
 repository = "https://github.com/sayed-anower/fr-rust"
 documentation = "https://docs.rs/fr-rust"
 readme = "DOCUMENTATION.md"
-keywords = ["actix-web", "postgres", "redis", "auth", "websocket"]
+keywords = ["web", "postgres", "redis", "auth", "websocket", "backend", "web-backend"]
 categories = ["web-programming", "asynchronous"]
 
 [features]
