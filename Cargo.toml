@@ -52,7 +52,7 @@ tracing = "0.1"
 async-trait = "0.1"
 
 # Actix/Web (Optional via 'web' or 'ws' features)
-actix-web = { version = "4.9", optional = true }
+actix-web = { version = "4.13.0", optional = true }
 actix-ws = { version = "0.3", optional = true }
 actix-files = { version = "0.6", optional = true }
 actix-multipart = { version = "0.6", optional = true }
