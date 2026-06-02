@@ -70,8 +70,8 @@ pub mod prelude {
         self, http_bad, http_bad_json, http_ok, http_ok_json, send_file, send_json, send_str,
         upload_file,
     };
-    pub use crate::server::{self, env_var, env_var_or_default, init_env};
-    pub use crate::types::{self, FileRlt, MainRlt, Rlt, RltRsp, Rps, Rqs};
+    pub use crate::server::{self, env_var, env_var_or_default, load_env};
+    pub use crate::types::{self, FileRlt, MainRlt, Rlt, RltRsp, Rsp, Rqs};
     pub use crate::ws::{self, UserMsg, WsConfig, WsManager};
     pub use crate::utils::{
         self,
