@@ -1,50 +1,30 @@
-```markdown
-# fr-rust Framework Documentation
-
-Welcome to the **fr-rust** framework documentation! This guide covers the complete setup, core features, routing, services, and utilities provided by the framework to help you build fast, secure, and scalable web applications in Rust.
-
----
-
-## 1. Getting Started
-
-To access all framework features, include the prelude in your files:
-
+# fr-rust Documentation
+**fr-rust** is a comprehensive, high-performance web framework utility library built on top of Actix-Web. It provides out-of-the-box support for DDoS protection, standardized responses, WebSockets, Redis, Database pooling, Cryptography, and common verification services (JWT, OTP, Link Verification, Email).
+## 1. Quick Start & Configuration
+Set up your server, initialize shared states, and protect your app with the built-in DDoS shield in your main entry point.
 ```rust
 use fr_rust::prelude::*;
 
-```
-## 2. Server Configuration (main.rs)
-The entry point of your application sets up all shared states, middleware, and dependency injections.
-```rust
-use fr_rust::prelude::*;
-
-// App Configuration Router
-pub fn app_config(cfg: &mut ServiceConfig) {
-    // Register routes here
-    cfg.service(index_file);
-    // cfg.service(test_responses);
-    // ...
-}
-
-#[actix_web::main]
+#[fr_rust::main]
 async fn main() -> MainRlt {
-    dotenv().ok();
-    
-    // --- Middlewares & Security ---
+    // 1. Load Environment Variables
+    load_env();
+
+    // 2. Configure DDoS Shield
     let ddos_shield = DdosShield::builder()
-        .max_requests(5) // Max requests per window
-        .window_secs(1)  // Window timeframe (1 second)
-        .ban_duration_secs(20)
+        .max_requests(5)          // Max requests per window
+        .window_secs(1)           // Time window (1 second)
+        .ban_duration_secs(20)    // Ban duration for violators
         .block_agent("malicious-bot")
         .allow_missing_ua(false)
         .build();
-    // jwt
+
+    // 3. Initialize Shared Services
     let jwt = Jwt::new();
-    // --- Service Initialization ---
-    // Email
+    
     let email_config = EmailConfig {
         smtp_host: env_var("SMTP_HOST"),
-        smtp_port: env_var("SMTP_PORT").parse().expect("SMTP_PORT must be a valid integer"),
+        smtp_port: env_var("SMTP_PORT").parse().expect("Invalid SMTP_PORT"),
         smtp_user: env_var("SMTP_USER"),
         smtp_pass: env_var("SMTP_PASS"),
         from_name: env_var("FROM_NAME"),
@@ -52,43 +32,31 @@ async fn main() -> MainRlt {
     };
     let email_service = EmailService::new(email_config).unwrap();
     
-    // Database
     let pool = DbPool::new(env_var("DATABASE_URL"));
-
-    // Redis
-    let redis_url = env_var("REDIS_URL");
-    let redis = RedisManager::new(redis_url).await.unwrap();
+    let redis = RedisManager::new(&env_var("REDIS_URL")).unwrap();
     
-    // Crypto
     let key = env_var("AES_KEY");
-    let key_bytes: &[u8; 32] = key.as_bytes().try_into().expect("AES_KEY must be exactly 32 bytes");
+    let key_bytes: &[u8; 32] = key.as_bytes().try_into().expect("AES_KEY must be 32 bytes");
     let crypto_service = CryptoService::new(key_bytes).unwrap();
     
-    // OTP & Link Verification
-    let otp_config = OtpConfig {
+    let otp_service = OtpService::new(OtpConfig {
         secret: env_var("KEY"),
         crypto: crypto_service.clone(),
         redis: redis.clone(),
         ttl_secs: 300 
-    };
-    let otp_service = OtpService::new(otp_config);
+    });
     
-    let linkv_config = LinkVConfig {
+    let linkv_service = LinkV::new(LinkVConfig {
         secret: env_var("KEY"),
         crypto: crypto_service.clone(),
         redis: redis.clone(),
         ttl_secs: 300 
-    };
-    let linkv_service = LinkV::new(linkv_config);
+    });
     
-    // WebSockets
-    let ws = WsManager::new(redis.clone(), pool.clone()); 
+    let ws = WsManager::new(WsConfig { server: 1, redis: redis.clone() });
 
-    // --- Server Boot ---
-    let ip = env_var_or_default("IP", "0.0.0.0");
-    let port = env_var_or_default("PORT", "8080");
-    let address = format!("{}:{}", ip, port);
-    
+    // 4. Start the HTTP Server
+    let address = format!("{}:{}", env_var_or_default("IP", "0.0.0.0"), env_var_or_default("PORT", "8080"));
     println!("Starting server at http://{}", address);
     
     HttpServer::new(move || App::new()
@@ -99,6 +67,7 @@ async fn main() -> MainRlt {
         .app_data(AppData::new(otp_service.clone()))
         .app_data(AppData::new(linkv_service.clone()))
         .app_data(AppData::new(jwt.clone()))
+        .app_data(AppData::new(ws.clone()))
         .configure(app_config)
         .wrap(ddos_shield.clone())
     )
@@ -107,11 +76,25 @@ async fn main() -> MainRlt {
     .await
 }
 
+// Route Configuration
+pub fn app_config(cfg: &mut ServiceConfig) {
+    cfg.service(index_file);
+}
+
 ```
+## 2. Common Types
+**fr-rust** exports convenient type aliases to reduce boilerplate:
+| Type Alias | Original Type | Description |
+|---|---|---|
+| Rsp | HttpResponse | Standard HTTP Response |
+| Rqs | HttpRequest | Standard HTTP Request |
+| Rlt | Result<(), actix::Error> | Standard Actix Result |
+| MainRlt | (Varies) | Main Function Result |
+| FileRlt | (Varies) | File Streaming Result |
 ## 3. Responses & Routing
-**fr-rust** provides comprehensive macros and utility functions to return standard HTTP responses, stream files, and parse JSON.
-### 3.1 File Streaming
-Stream large files easily directly to the client.
+**fr-rust** provides comprehensive macros and utility functions to return standard HTTP responses, stream files, and parse JSON easily.
+### File Streaming
+Stream large files directly to the client with ease.
 ```rust
 #[get("/")]
 pub async fn index_file() -> FileRlt {
@@ -119,7 +102,7 @@ pub async fn index_file() -> FileRlt {
 }
 
 ```
-### 3.2 Standard & JSON Responses
+### Standard & JSON Responses
 | Response Helper | Purpose | Example |
 |---|---|---|
 | http_ok(msg) | 200 OK with string | http_ok("Success") |
@@ -149,18 +132,43 @@ async fn test_responses(path: Path<String>) -> Rsp {
 }
 
 ```
-## 4. Database Operations
-Access your relational database using AppData<DbPool>.
- * **execute**: Run queries without expecting a return dataset (CREATE, INSERT, UPDATE).
- * **query**: Fetch multiple rows.
- * **query_one**: Fetch exactly one row.
- * **query_opt**: Fetch an optional row (returns Option<Row>).
+## 4. WebSockets
+Built on top of actix-ws, the WebSocket manager (WsManager) provides robust room management and messaging utilities.
+**Core Methods:**
+```rust
+// 1. Create a high-performance unbounded channel for a user connection
+let (tx, mut rx) = mpsc::channel::<String>(128);
+
+// 2. Manage Users
+ws_manager.register(user_id, tx);
+ws_manager.drop_user(user_id);
+
+// 3. Manage Rooms
+ws_manager.join_room(user_id, room_name);
+ws_manager.leave_room(user_id, room_name);
+ws_manager.drop_room(room_name); // Note: Renamed from drop_user(room_name) to clarify intent
+
+// 4. Send Messages
+ws_manager.msg_user(user_id, "Hello User!".to_string());
+ws_manager.msg_room(room_name, UserMsg::new("SenderID", "RoomID", "Hello Room!"));
+ws_manager.broadcast("System Maintenance in 5 minutes!".to_string());
+
+// 5. Query Rooms
+let messages = ws_manager.get_room_msgs(room_name);
+
+```
+## 5. Database Operations
+Access your relational database easily via AppData<DbPool>.
+ * **execute:** Run queries without expecting a return dataset (CREATE, INSERT, UPDATE).
+ * **query:** Fetch multiple rows.
+ * **query_one:** Fetch exactly one row.
+ * **query_opt:** Fetch an optional row (returns Option<Row>).
 ```rust
 #[get("/test/db")]
 async fn test_db(pool: AppData<DbPool>) -> Rsp {
     // Execution
-    pool.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT);", &[]).await;
-    pool.execute("INSERT INTO users (name) VALUES ($1);", &[&"Alice"]).await;
+    pool.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT);", &[]).await.unwrap();
+    pool.execute("INSERT INTO users (name) VALUES ($1);", &[&"Alice"]).await.unwrap();
     
     // Multiple Results
     let rows = pool.query("SELECT id, name FROM users;", &[]).await.unwrap();
@@ -176,55 +184,52 @@ async fn test_db(pool: AppData<DbPool>) -> Rsp {
 }
 
 ```
-## 5. Redis Integrations
-**fr-rust** features a fully-featured async Redis manager injected via web::Data<RedisManager>.
-### Key Features
- * **Basic KV & TTL:** set, get, set_ex, exists, ttl
- * **Hashes:** hset, hget, hdel
- * **Lists:** lpush, rpush, lrange
- * **Sets:** sadd, smembers
- * **Pub/Sub:** Coordinated batched pub/sub for strings and JSON payloads.
+## 6. Redis Integrations
+Injected via AppData<RedisManager>, the Redis client supports standard operations, TTL, Hashes, Lists, Sets, and coordinated batch Pub/Sub.
 **Pub/Sub Example:**
 ```rust
-// Pub
+let redis = redis_manager.get_connection().await.unwrap();
+
+// Publish a message
 redis.publish("event_name", "content").await.unwrap();
-// Sub
-let mut stream = redis.subscribe(event_name).await?;
-    
+
+// Subscribe to a stream
+let mut stream = redis.subscribe("event_name").await?;
 while let Some(msg) = stream.next().await {
-    let payload: String =     msg.get_payload()?;
+    let payload: String = msg.get_payload()?;
     println!("Received: {}", payload);
-
-}
-```
-## 6. Verification & Notification Services
-### 6.1 Email Service
-Send emails easily utilizing the injected EmailService.
-```rust
-#[get("/test/email")]
-async fn test_email(email_service: web::Data<EmailService>) -> Rsp {
-    let data = EmailData {
-        to: "receiver@example.com".to_string(),
-        subject: "Hello!".to_string(),
-        body: "Mail body here.".to_string(),
-    };
-    
-    match email_service.send_email(config, data).await.unwrap() {
-        Ok(_) => http_ok("Sent!"),
-        Err(_) => http_bad("Failed."),
-    }
 }
 
 ```
-### 6.2 OTP Generation & Verification
+## 7. Verification & Notification Services
+### 7.1 JSON Web Tokens (JWT)
 ```rust
-let otp = otp_service.generate_otp("user123", 6);
+let secret = "my_ultra_secure_secret_key_2026";
+let user_id = "user_12345";
+
+// Generate token (No expiration)
+let forever_token = jwt.generate_token(user_id, secret).unwrap();
+
+// Generate token (Expiring)
+let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as usize;
+let expiry_timestamp = current_time + 3600; // 1 hour from now
+let expiring_token = jwt.generate_exp_token(user_id, secret, expiry_timestamp).unwrap();
+
+// Verify
+let is_valid = jwt.verify_token(&forever_token, secret);
+
+```
+### 7.2 OTP Generation & Verification
+Access via AppData<OtpService>.
+```rust
+let otp = otp_service.generate_otp("user123", 6); // 6-digit OTP
 if otp_service.verify_otp("user123", &otp) {
     http_ok("Valid OTP!")
 }
 
 ```
-### 6.3 Link Verification Tokens
+### 7.3 Link Verification Tokens
+Access via AppData<LinkV>.
 ```rust
 let token = linkv_service.generate_token("user123");
 if linkv_service.verify_token("user123", &token) {
@@ -232,54 +237,54 @@ if linkv_service.verify_token("user123", &token) {
 }
 
 ```
-### 6.4 JWT Token
+### 7.4 Email Service
+Access via AppData<EmailService>.
 ```rust
-let secret = "my_ultra_secure_secret_key_2026";
+#[get("/test/email")]
+async fn test_email(email_service: AppData<EmailService>) -> Rsp {
+    let data = EmailData {
+        to: "receiver@example.com".to_string(),
+        subject: "Hello!".to_string(),
+        body: "Mail body here.".to_string(),
+    };
+    
+    match email_service.send_email(&data).await {
+        Ok(_) => http_ok("Sent!"),
+        Err(_) => http_bad("Failed."),
+    }
+}
 
-let user_id = "user_12345";
-
-// Generate a standard token with no expiration claim
-let forever_token = jwt.generate_token(user_id, secret).unwrap();
-
-// Set token to expire exactly 2 seconds from now
-let expiry_timestamp = current_time + 2; 
-
-let expiring_token = jwt.generate_exp_token(user_id, secret, expiry_timestamp).unwrap();
-
-// Verify it immediately
-let is_valid_now = jwt.verify_token(&forever_token, secret); // true/false
-
-// Get current Unix timestamp
-let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as usize;
 ```
-## 7. Cryptography Service
-Inject AppData<CryptoService> to safely encrypt data or hash passwords.
+## 8. Cryptography Service
+Inject AppData<CryptoService> to securely encrypt data or hash passwords.
  * **Symmetric Encryption:** encrypt_text / decrypt_text
- * **Password Hashing:** hash_data / verify_hash (Async/Secure)
+ * **Password Hashing:** hash_data / verify_hash (Async, highly secure)
  * **Fast Hashing:** sha256_hash
 ```rust
 #[get("/test/crypto")]
 async fn test_crypto(crypto: AppData<CryptoService>) -> Rsp {
+    // Symmetric Encryption
     let encrypted = crypto.encrypt_text("Hello").unwrap();
     let decrypted = crypto.decrypt_text(&encrypted.encrypted_text).unwrap();
     
+    // Fast Hash
+    let fast_hashing = crypto.sha256_hash("password").unwrap();
+    
+    // Secure Password Hashing (Slower)
     let hashed = crypto.hash_data("password").await.unwrap();
-let fast_hashing = crypto.sha256_hash("password").await.unwrap();
     let is_valid = crypto.verify_hash("password", &hashed.hash).await.unwrap();
     
     http_ok("Crypto operations completed.")
 }
 
 ```
-## 8. General Utilities
-Standalone utilities for CLI interactions and fast key generation.
+## 9. General Utilities
+Standalone utility macros and functions for rapid development.
 ```rust
-/// Captures user input directly from the terminal like python
-let name = input("What's your name!");
+// Capture user input directly from the terminal (Python-like)
+let name = input("What's your name? ");
 
-/// Generates a random HEX encoded key of the given byte length
-let key = generate_key(100); // 100 length random key
+// Generate a random HEX-encoded key of a specific byte length
+let key = generate_key(100); // 100 character random string
 
 ```
-
-### Web socket will be added here...

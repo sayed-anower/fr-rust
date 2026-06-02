@@ -1,175 +1,153 @@
-// These all are available to prelude already, just simply use.
-// Feels easy
-pub mod clean;
+// ==========================================
+// 1. Conditional Module Declarations
+// ==========================================
+
+#[cfg(feature = "crypto")]
 pub mod crypto;
+
+#[cfg(feature = "db")]
 pub mod db;
-pub mod email;
-pub mod otp;
-pub mod res;
-pub mod server;
-pub mod utils;
-pub mod jwt;
-pub mod redis;
-pub mod linkv;
+
+#[cfg(feature = "ddos")]
 pub mod ddos;
+
+#[cfg(feature = "email")]
+pub mod email;
+
+#[cfg(feature = "jwt")]
+pub mod jwt;
+
+#[cfg(feature = "linkv")]
+pub mod linkv;
+
+#[cfg(feature = "otp")]
+pub mod otp;
+
+#[cfg(feature = "redis")]
+pub mod redis;
+
+#[cfg(feature = "res")]
+pub mod res;
+
+#[cfg(feature = "server")]
+pub mod server;
+
+#[cfg(feature = "types")]
+pub mod types;
+
+#[cfg(feature = "utils")]
+pub mod utils;
+
+#[cfg(feature = "ws")]
 pub mod ws;
 
-// Feels easy
+// ==========================================
+// 2. The Conditional Framework Prelude
+// ==========================================
 pub mod prelude {
 
-    // =========================
-    // External crates
-    // =========================
-
-    pub use actix_web;
-    pub use actix_ws;
-    pub use aes_gcm;
-    pub use anyhow;
-    pub use argon2;
-    pub use base64;
-    pub use dashmap;
-    pub use deadpool_postgres;
-    pub use dotenvy;
-    pub use dotenvy::{dotenv};
-    pub use futures_util;
-    pub use futures_util::StreamExt;
-    pub use hmac;
-    pub use lettre;
-    pub use rand;
-    pub use serde_json;
-    pub use serde_json::json;
-    pub use serde;
-    pub use sha2;
-    pub use tokio;
-    pub use tokio_postgres;
-    pub use uuid;
-    pub use actix_multipart;
-    pub use actix_multipart::{
-        Multipart
-    };
-
-    pub use deadpool_redis;
+    // --------------------------------------
+    // External Re-exports (Gated by features)
+    // --------------------------------------
     
-    // =========================
-    // Actix Web
-    // =========================
+    #[cfg(feature = "ws")]
+    pub use actix_ws;
 
+    #[cfg(feature = "crypto")]
+    pub use aes_gcm;
+
+    pub use anyhow; // Core utility, always on
+
+    #[cfg(feature = "crypto")]
+    pub use argon2;
+
+    pub use base64; // Core utility, always on
+    pub use dashmap; // Core utility, always on
+    pub use dotenvy::{self, dotenv}; // Core utility, always on
+    pub use serde::{self, Deserialize, Serialize}; // Core utility, always on
+    pub use serde_json::{self, json}; // Core utility, always on
+    pub use tokio; // Core utility, always on
+
+    #[cfg(feature = "db")]
+    pub use deadpool_postgres;
+    #[cfg(feature = "db")]
+    pub use tokio_postgres;
+
+    #[cfg(feature = "redis")]
+    pub use deadpool_redis::{self, redis::AsyncCommands};
+
+    #[cfg(feature = "web")]
+    pub use futures_util::{self, StreamExt};
+    #[cfg(feature = "web")]
+    pub use actix_multipart::{self, Multipart};
+    #[cfg(feature = "web")]
     pub use actix_web::{
-        HttpRequest, HttpServer,App,  Responder, delete, get, patch, post, put, rt,
+        self, delete, get, patch, post, put, rt, web, App, HttpRequest, HttpServer, Responder, main,
         web::{Form, Json, Path, Payload, Query, ServiceConfig, Data as AppData},
     };
 
-    // =========================
-    // Serde
-    // =========================
+    #[cfg(feature = "crypto")]
+    pub use hmac;
+    #[cfg(feature = "crypto")]
+    pub use sha2;
+    #[cfg(feature = "crypto")]
+    pub use rand;
 
-    pub use serde::{Deserialize, Serialize};
+    #[cfg(feature = "email")]
+    pub use lettre;
 
-    // =========================
-    // STD
-    // =========================
+    pub use uuid; // Core utility, always on
 
-    pub use std::{collections::HashMap, env, io::Result, sync::Arc};
+    // --------------------------------------
+    // Standard Library Re-exports
+    // --------------------------------------
+    pub use std::{collections::HashMap, env, io::Result as IoResult, sync::Arc};
 
-    // =========================
-    // Server
-    // =========================
+    // --------------------------------------
+    // Internal Library Re-exports (Gated)
+    // --------------------------------------
+    #[cfg(feature = "crypto")]
+    pub use crate::crypto::{self, CryptoService};
 
-    pub use crate::server;
-    pub use crate::server::{env_var, env_var_or_default, init_env};
+    #[cfg(feature = "db")]
+    pub use crate::db::{self, DbPool};
 
-    // =========================
-    // Crypto
-    // =========================
+    #[cfg(feature = "ddos")]
+    pub use crate::ddos::{self, DdosConfig, DdosShield};
 
-    pub use crate::crypto;
-    pub use crate::crypto::{CryptoService};
+    #[cfg(feature = "email")]
+    pub use crate::email::{self, EmailConfig, EmailData, EmailService};
 
-    // =========================
-    // OTP
-    // =========================
+    #[cfg(feature = "jwt")]
+    pub use crate::jwt::{self, Jwt};
 
-    pub use crate::otp;
-    pub use crate::otp::{OtpService, OtpConfig};
+    #[cfg(feature = "linkv")]
+    pub use crate::linkv::{self, LinkV, LinkVConfig};
 
-    // =========================
-    // Email
-    // =========================
+    #[cfg(feature = "otp")]
+    pub use crate::otp::{self, OtpConfig, OtpService};
 
-    pub use crate::email;
-    pub use crate::email::{EmailService, EmailConfig, EmailData};
+    #[cfg(feature = "redis")]
+    pub use crate::redis::{self, RedisManager};
 
-    // =========================
-    // DB
-    // =========================
-
-    pub use crate::db;
-    pub use crate::db::{DbPool};
-
-    // =========================
-    // Web Socket
-    // =========================
-
-    pub use crate::ws;
-    pub use crate::ws::{WsManager, WsConfig, UserMsg};
-
-    // =========================
-    // JWT Token
-    // =========================
-    pub use crate::jwt;
-    pub use crate::jwt::{Jwt};
-    
-    // =========================
-    // Responses
-    // =========================
-
-    pub use crate::res;
+    #[cfg(feature = "res")]
     pub use crate::res::{
-        http_bad, http_bad_json, http_ok, http_ok_json, send_file, send_json, send_str, upload_file
+        self, http_bad, http_bad_json, http_ok, http_ok_json, send_file, send_json, send_str,
+        upload_file,
     };
 
-    // =========================
-    // Clean Looks
-    // =========================
+    #[cfg(feature = "server")]
+    pub use crate::server::{self, env_var, env_var_or_default, init_env};
 
-    pub use crate::clean;
-    pub use crate::clean::{Rlt, Rsp, RltRsp, MainRlt, FileRlt, Rqs};
-    
-        
-    // =========================
-    // Redis
-    // =========================
-    pub use crate::redis;
-    pub use crate::redis::{
-        RedisManager,
-    };
-    
-    // =========================
-    // Utils
-    // =========================
-    pub use crate::utils;
+    #[cfg(feature = "types")]
+    pub use crate::types::{self, FileRlt, MainRlt, Rlt, RltRsp, Rps, Rqs};
+
+    #[cfg(feature = "ws")]
+    pub use crate::ws::{self, UserMsg, WsConfig, WsManager};
+
+    #[cfg(feature = "utils")]
     pub use crate::utils::{
-        utils::{input, generate_token},
-        index_file::index_file,
-        config::app_config
-    };
-
-    // =========================
-    // Link Verification
-    // =========================
-    pub use crate::linkv;
-    pub use crate::linkv::{
-        LinkV,
-        LinkVConfig
-    };
-
-    // =========================
-    // DDoS Protection
-    // =========================
-    pub use crate::ddos;
-    pub use crate::ddos::{
-        DdosConfig,
-        DdosShield
+        self,
+        utils::{generate_token, input},
     };
 }
-

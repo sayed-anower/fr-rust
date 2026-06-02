@@ -2,7 +2,7 @@ use dotenvy::dotenv;
 use std::env;
 
 // Initialized env
-pub fn init_env() {
+pub fn load_env() {
     dotenv().ok();
 }
 // Get var or default

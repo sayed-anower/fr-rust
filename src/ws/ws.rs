@@ -62,22 +62,23 @@ impl WsManager {
         Ok(())
     }
 
-    // 3. "create_room" create new room in redis
-    pub async fn create_room(&self, room_name: &str) -> anyhow::Result<()> {
-        let mut conn = self.redis.get_connection().await?;
-        // Fixed: Added explicit () return type via turbofish
-        conn.set::<_, _, ()>(format!("room_exists:{}", room_name), "1").await?;
-        Ok(())
-    }
-
-    // 4. "join_room" add new user_id to room users.
+    // 3. "join_room" add new user_id to room users.
     pub async fn join_room(&self, room_name: &str, uid: &str) -> Result<()> {
         let mut conn = self.redis.get_connection().await?;
         // Fixed: Added explicit () return type via turbofish
         conn.sadd::<_, _, ()>(format!("room:{}", room_name), uid).await?;
         Ok(())
     }
+    
+    // 4. "leave_room" 
+    pub async fn leave_room(&self, room_name: &str, uid: &str) -> Result<()> {
+        let mut conn = self.redis.get_connection().await?;
+        conn.srem::<_, _, ()>(format!("room:{}", room_name), uid).await?;
+        
+        Ok(())
+    }
 
+    
     // 5. "msg_room" loop in room_users, send msg, save msg in redis
     pub async fn msg_room(&self, room_name: &str, msg_obj: UserMsg) -> Result<()> {
         let mut conn = self.redis.get_connection().await?;
@@ -142,7 +143,6 @@ impl WsManager {
         // Fixed: Added explicit () return type via turbofish for all del calls
         conn.del::<_, ()>(format!("room:{}", room_name)).await?;
         conn.del::<_, ()>(format!("room_msgs:{}", room_name)).await?;
-        conn.del::<_, ()>(format!("room_exists:{}", room_name)).await?;
         Ok(())
     }
 
@@ -175,4 +175,3 @@ impl WsManager {
         Ok(msgs)
     }
 }
-
