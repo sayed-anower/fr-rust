@@ -1,0 +1,32 @@
+name: Publish to crates.io
+
+on:
+  push:
+    # This triggers the workflow only when a tag starting with 'v' is pushed
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish Crate
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Run tests (Safety check)
+      run: cargo test --all-features --verbose
+
+    - name: Verify package layout and validity
+      run: cargo package --verbose
+
+    - name: Publish to crates.io
+      run: cargo publish --token ${{ secrets.IO_TOKEN }}
+      
