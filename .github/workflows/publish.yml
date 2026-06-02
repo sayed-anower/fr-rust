@@ -2,9 +2,8 @@ name: Publish to crates.io
 
 on:
   push:
-    # This triggers the workflow only when a tag starting with 'v' is pushed
     tags:
-      - 'v0.1.0'
+      - 'v*'
 
 env:
   CARGO_TERM_COLOR: always
@@ -29,4 +28,3 @@ jobs:
 
     - name: Publish to crates.io
       run: cargo publish --token ${{ secrets.IO_TOKEN }}
-      
