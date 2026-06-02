@@ -3,45 +3,19 @@ name = "fr-rust"
 version = "0.1.0"
 edition = "2024"
 authors = ["Sayed Anower <sayed.anower.17.2@gmail.com>"]
-description = "A comprehensive framework/utility library for Web Backend Development."
+description = "A comprehensive framework/utility library for Actix-web, Postgres, Redis, and authentication."
 license = "MIT"
 repository = "https://github.com/sayed-anower/fr-rust"
 documentation = "https://docs.rs/fr-rust"
 readme = "DOCUMENTATION.md"
-keywords = ["web", "websocket", "backend", "framework"]
+keywords = ["actix-web", "postgres", "redis", "auth", "websocket"]
 categories = ["web-programming", "asynchronous"]
 
-[features]
-# Web and core features loaded by default. 
-# Added internal modules here so they initialize smoothly.
-default = ["web", "db", "redis", "crypto", "jwt", "email", "ddos", "otp", "linkv", "res", "server", "types", "utils", "ws"]
-
-# The "full" flag activates absolutely everything automatically
-full = ["default"]
-
-# Individual specific feature flags linked to external dependencies
-web = ["dep:actix-web", "dep:actix-multipart", "dep:actix-files", "dep:futures-util"]
-ws = ["web", "dep:actix-ws"] 
-crypto = ["dep:argon2", "dep:aes-gcm", "dep:hmac", "dep:sha2", "dep:rand"]
-db = ["dep:tokio-postgres", "dep:deadpool-postgres"]
-redis = ["dep:deadpool-redis"]
-email = ["dep:lettre"]
-jwt = ["dep:jsonwebtoken"]
-
-# Internal framework feature flags
-ddos = []
-otp = ["crypto"]
-linkv = []
-res = ["web"]
-server = []
-types = []
-utils = []
-
 [dependencies]
-# Required / Core Utilities (Always compiled)
+# Required / Core Utilities
 tokio = { version = "1.40", features = ["full"] }
 anyhow = "1.0"
-dashmap = "6.2"
+dashmap = "6.1"
 dotenvy = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -50,32 +24,30 @@ hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 async-trait = "0.1"
+uuid = { version = "1.10", features = ["v4", "serde"] }
 
-# Actix/Web (Optional via 'web' or 'ws' features)
-actix-web = { version = "4.13", optional = true }
-actix-ws = { version = "0.3", optional = true }
-actix-files = { version = "0.6", optional = true }
-actix-multipart = { version = "0.6", optional = true }
-futures-util = { version = "0.3", optional = true }
+# Actix / Web Stack
+actix-web = "4.9"
+actix-ws = "0.3"
+actix-files = "0.6"
+actix-multipart = "0.6"
+futures-util = "0.3"
 
-# Database (Optional via 'db' feature)
-tokio-postgres = { version = "0.7", optional = true }
-deadpool-postgres = { version = "0.14", optional = true }
+# Database Stack
+tokio-postgres = "0.7"
+deadpool-postgres = "0.14"
 
-# Security & Crypto (Optional via 'crypto' or 'otp' features)
-argon2 = { version = "0.5.3", optional = true }
-aes-gcm = { version = "0.10", optional = true }
-hmac = { version = "0.12", optional = true }
-sha2 = { version = "0.10", optional = true }
-rand = { version = "0.8", optional = true }
+# Security, Crypto & Auth
+argon2 = "0.5"
+aes-gcm = "0.10"
+hmac = "0.12"
+sha2 = "0.10"
+rand = "0.8"
+jsonwebtoken = "9"
 
-# JWT (Optional via 'jwt' feature)
-# Note: jsonwebtoken v10 requires an explicit crypto backend feature (e.g., "aws_lc_rs" or "rust_crypto")
-jsonwebtoken = { version = "10", features = ["aws_lc_rs"], optional = true }
-uuid = { version = "1.23", features = ["v4", "serde"] } # Kept as core utility for general app use
+# Email
+lettre = { version = "0.11.22", default-features = false, features = ["tokio1", "smtp-transport", "builder", "rustls-tls", "tokio1-rustls"] }
 
-# Email (Optional via 'email' feature)
-lettre = { version = "0.11.22", default-features = false, features = ["tokio1", "smtp-transport", "builder", "rustls-tls", "tokio1-rustls"], optional = true }
+# Redis Stack
+deadpool-redis = "0.23"
 
-# Redis (Optional via 'redis' feature)
-deadpool-redis = { version = "0.23", optional = true }
