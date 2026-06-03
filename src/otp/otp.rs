@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use rand::{rngs::OsRng, RngCore};
+use rand::Rng;
 use deadpool_redis::redis::AsyncCommands;
 
 #[derive(Clone)]
@@ -57,9 +57,9 @@ impl OtpService {
 
     fn random_digits(digits: u32) -> String {
         let mut bytes = [0u8; 8];
-        // FIX: Create a mutable instance of OsRng to call fill_bytes on
-        let mut os_rng = OsRng;
-        os_rng.fill_bytes(&mut bytes);
+        
+        // rand::rng() gets the new, optimized cryptographically secure thread-local generator
+        rand::rng().fill_bytes(&mut bytes);
         
         let num = u64::from_le_bytes(bytes);
         let otp = num % 10u64.pow(digits);
