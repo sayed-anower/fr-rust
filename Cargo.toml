@@ -12,41 +12,45 @@ keywords = ["actix-web", "postgres", "redis", "auth", "websocket"]
 categories = ["web-programming", "asynchronous"]
 
 [dependencies]
-tokio = { version = "1.48", features = ["full"] }
-anyhow = "1"
-dashmap = "6"
+# Core Async, Error, Data structures
+tokio = { version = "1.52", features = ["full"] }
+anyhow = "1.0"
+dashmap = "6.2"
 dotenvy = "0.15"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 base64 = "0.22"
 hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 async-trait = "0.1"
-uuid = { version = "1", features = ["v4", "serde"] }
+uuid = { version = "1.23", features = ["v4", "serde"] }
 
-actix-web = "4.13"
-actix-ws = "0.3"
+# Actix Web Ecosystem (Aligned for compatibility)
+actix-web = "4.9"
+actix-ws = "0.4"
 actix-files = "0.6"
 actix-multipart = "0.7"
 futures-util = "0.3"
 
+# Database Drivers & Pooling
 tokio-postgres = "0.7"
 deadpool-postgres = "0.14"
+deadpool-redis = "0.23"
 
+# Cryptography & Security
 argon2 = "0.5"
 aes-gcm = "0.10"
 hmac = "0.12"
 sha2 = "0.10"
-rand = "0.9"
-jsonwebtoken = "10"
+rand = "0.10.1"
+jsonwebtoken = "10.0"
 
+# Email Handling
 lettre = { version = "0.11", default-features = false, features = [
-"tokio1",
-"smtp-transport",
-"builder",
-"rustls-tls",
-"tokio1-rustls"
+    "tokio1",
+    "smtp-transport",
+    "builder",
+    "rustls-tls",
+    "tokio1-rustls"
 ] }
-
-deadpool-redis = "0.23"
