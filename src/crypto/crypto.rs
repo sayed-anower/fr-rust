@@ -2,7 +2,6 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
-use anyhow::{anyhow, Result};
 use argon2::{
     password_hash::{
         rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
@@ -12,7 +11,39 @@ use argon2::{
 use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
 use sha2::{Digest, Sha256};
+use thiserror::Error;
 use tokio::task;
+
+// --- ERROR HANDLING ---
+
+#[derive(Error, Debug)]
+pub enum CryptoError {
+    #[error("Invalid encryption key length")]
+    InvalidKeyLength,
+
+    #[error("Encryption failed")]
+    EncryptionFailed,
+
+    #[error("Decryption failed")]
+    DecryptionFailed,
+
+    #[error("Invalid encrypted data: too short")]
+    InvalidDataLength,
+
+    #[error("Base64 decode error: {0}")]
+    Base64(#[from] base64::DecodeError),
+
+    #[error("Invalid UTF-8 sequence: {0}")]
+    Utf8(#[from] std::string::FromUtf8Error),
+
+    #[error("Argon2 hashing error: {0}")]
+    Argon2(#[from] argon2::password_hash::Error),
+
+    #[error("Async task join error: {0}")]
+    Join(#[from] tokio::task::JoinError),
+}
+
+pub type Result<T> = std::result::Result<T, CryptoError>;
 
 // --- DATA STRUCTURES ---
 
@@ -40,8 +71,8 @@ impl CryptoService {
     /// Fixes the performance issue of expanding the key schedule on every request.
     pub fn new(encryption_key: &[u8; 32]) -> Result<Self> {
         let cipher = Aes256Gcm::new_from_slice(encryption_key)
-            .map_err(|_| anyhow!("Invalid encryption key length"))?;
-        
+            .map_err(|_| CryptoError::InvalidKeyLength)?;
+
         Ok(Self { cipher })
     }
 
@@ -56,7 +87,7 @@ impl CryptoService {
         let ciphertext = self
             .cipher
             .encrypt(nonce, text.as_bytes())
-            .map_err(|_| anyhow!("Encryption failed"))?;
+            .map_err(|_| CryptoError::EncryptionFailed)?;
 
         // Pre-allocate exact capacity to prevent reallocation vectors
         let mut combined = Vec::with_capacity(12 + ciphertext.len());
@@ -74,7 +105,7 @@ impl CryptoService {
         let decoded = general_purpose::STANDARD.decode(encrypted_text)?;
 
         if decoded.len() < 12 {
-            return Err(anyhow!("Invalid encrypted data: too short"));
+            return Err(CryptoError::InvalidDataLength);
         }
 
         let (nonce_bytes, ciphertext) = decoded.split_at(12);
@@ -84,7 +115,7 @@ impl CryptoService {
         let plaintext = self
             .cipher
             .decrypt(nonce, ciphertext)
-            .map_err(|_| anyhow!("Decryption failed"))?;
+            .map_err(|_| CryptoError::DecryptionFailed)?;
 
         Ok(DecryptedData {
             text: String::from_utf8(plaintext)?,
@@ -109,14 +140,14 @@ impl CryptoService {
     pub async fn hash_data(&self, data: &str) -> Result<HashedData> {
         let data = data.to_string();
 
-        let hash = task::spawn_blocking(move || {
+        let hash = task::spawn_blocking(move || -> Result<String> {
             let salt = SaltString::generate(&mut OsRng);
             let argon2 = Argon2::default();
 
-            argon2
-                .hash_password(data.as_bytes(), &salt)
-                .map(|h| h.to_string())
-                .map_err(|e| anyhow!("Hashing failed: {}", e))
+            let hashed = argon2
+                .hash_password(data.as_bytes(), &salt)?; // `?` cleanly converts to CryptoError::Argon2
+            
+            Ok(hashed.to_string())
         })
         .await??;
 

@@ -4,7 +4,10 @@
 Set up your server, initialize shared states, and protect your app with the built-in DDoS shield in your main entry point.
 ```rust
 use fr_rust::prelude::*;
-
+// Use actix web
+use actix_web::{
+    App, HttpServer, web::Data as AppData, web
+};
 #[fr_rust::main]
 async fn main() -> MainRlt {
     // 1. Load Environment Variables
@@ -77,7 +80,7 @@ async fn main() -> MainRlt {
 }
 
 // Route Configuration
-pub fn app_config(cfg: &mut ServiceConfig) {
+pub fn app_config(cfg: &mut web::ServiceConfig) {
     cfg.service(index_file);
 }
 
@@ -92,7 +95,7 @@ pub fn app_config(cfg: &mut ServiceConfig) {
 | MainRlt | (Varies) | Main Function Result |
 | FileRlt | (Varies) | File Streaming Result |
 ## 3. Responses & Routing
-**fr-rust** provides comprehensive macros and utility functions to return standard HTTP responses, stream files, and parse JSON easily.
+**fr-rust** provides utility functions to return standard HTTP responses, stream files, and parse JSON easily.
 ### File Streaming
 Stream large files directly to the client with ease.
 ```rust
@@ -136,7 +139,9 @@ async fn test_responses(path: Path<String>) -> Rsp {
 Built on top of actix-ws, the WebSocket manager (WsManager) provides robust room management and messaging utilities.
 **Core Methods:**
 ```rust
+// Use actix-ws with this manager
 // 1. Create a high-performance unbounded channel for a user connection
+use tokio::sync::mpsc;
 let (tx, mut rx) = mpsc::channel::<String>(128);
 
 // 2. Manage Users
@@ -156,6 +161,29 @@ ws_manager.broadcast("System Maintenance in 5 minutes!".to_string());
 // 5. Query Rooms
 let messages = ws_manager.get_room_msgs(room_name);
 
+// Use the manager in actix route
+#[get("/ws/{user_id}")]
+async fn ws_handler(
+    req: HttpRequest,
+    body: web::Payload,
+    ws_manager: web::Data<WsManager>,
+    path: web::Path<String>,
+) -> Rsp {
+    let user_id = path.into_inner();
+
+    // 1. Setup high-performance bounded channel (128 items is ideal for memory/backpressure balance)
+    let (tx, mut rx) = mpsc::channel::<String>(128);
+
+    // Perform WebSocket handshake
+    let (res, mut session, mut msg_stream) = match actix_ws::handle(&req, body) {
+        Ok(res) => res,
+        Err(_) => return http_bad("Internal Server Error!"), 
+    };
+
+    // 2. Register user with the manager
+    ws_manager.register(&user_id, tx);
+    // here your code.....
+}
 ```
 ## 5. Database Operations
 Access your relational database easily via AppData<DbPool>.
@@ -188,6 +216,11 @@ async fn test_db(pool: AppData<DbPool>) -> Rsp {
 Injected via AppData<RedisManager>, the Redis client supports standard operations, TTL, Hashes, Lists, Sets, and coordinated batch Pub/Sub.
 **Pub/Sub Example:**
 ```rust
+// Another operations same as deadpool_redis or redis-rs
+// It just helps you to create redis pool auto & handle pub/sub.
+use deadpool_redis::redis::AsyncCommands;
+use futures_util::StreamExt;
+
 let redis = redis_manager.get_connection().await.unwrap();
 
 // Publish a message
@@ -222,8 +255,8 @@ let is_valid = jwt.verify_token(&forever_token, secret);
 ### 7.2 OTP Generation & Verification
 Access via AppData<OtpService>.
 ```rust
-let otp = otp_service.generate_otp("user123", 6); // 6-digit OTP
-if otp_service.verify_otp("user123", &otp) {
+let otp = otp_service.generate_otp("user123", 6).await.unwrap(); // 6-digit OTP
+if otp_service.verify_otp("user123", &otp).await.unwrap() {
     http_ok("Valid OTP!")
 }
 
@@ -231,8 +264,8 @@ if otp_service.verify_otp("user123", &otp) {
 ### 7.3 Link Verification Tokens
 Access via AppData<LinkV>.
 ```rust
-let token = linkv_service.generate_token("user123");
-if linkv_service.verify_token("user123", &token) {
+let token = linkv_service.generate_token("user123").await.unwrap();
+if linkv_service.verify_token("user123", &token).await.unwrap() {
     http_ok("Valid Token!")
 }
 
@@ -286,5 +319,4 @@ let name = input("What's your name? ");
 
 // Generate a random HEX-encoded key of a specific byte length
 let key = generate_key(100); // 100 character random string
-
 ```

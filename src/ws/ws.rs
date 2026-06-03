@@ -1,13 +1,30 @@
 use crate::prelude::*;
 use deadpool_redis::redis::AsyncCommands;
-use anyhow::{Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::sync::mpsc;
 
+// 1. Define the custom error enum using thiserror
+#[derive(Error, Debug)]
+pub enum WsError {
+    #[error("Redis command error: {0}")]
+    Redis(#[from] deadpool_redis::redis::RedisError),
+
+    // Assuming self.redis.get_connection() returns a deadpool_redis::PoolError. 
+    // If RedisManager uses a different error, you can swap this type.
+    #[error("Redis pool error: {0}")]
+    RedisPool(#[from] deadpool_redis::PoolError),
+
+    #[error("JSON serialization/deserialization error: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+// 2. Create a custom Result alias to clean up the function signatures
+pub type Result<T> = std::result::Result<T, WsError>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserMsg {
@@ -52,7 +69,7 @@ impl WsManager {
     }
 
     // 2. "register" save new in redis: user_id: server
-    pub async fn register(&self, uid: &str, tx: mpsc::Sender<String>) -> anyhow::Result<()> {
+    pub async fn register(&self, uid: &str, tx: mpsc::Sender<String>) -> Result<()> {
         let mut conn = self.redis.get_connection().await?;
 
         // Fixed: Added explicit () return type via turbofish
@@ -78,7 +95,6 @@ impl WsManager {
         Ok(())
     }
 
-    
     // 5. "msg_room" loop in room_users, send msg, save msg in redis
     pub async fn msg_room(&self, room_name: &str, msg_obj: UserMsg) -> Result<()> {
         let mut conn = self.redis.get_connection().await?;
@@ -99,7 +115,7 @@ impl WsManager {
     }
 
     // 6. "msg_user" take user id, check server match -> send locally OR publish
-    pub async fn msg_user(&self, uid: &str, msg: String) -> anyhow::Result<()> {
+    pub async fn msg_user(&self, uid: &str, msg: String) -> Result<bool> {
         let mut conn = self.redis.get_connection().await?;
         
         // Fetch user server data from Redis
@@ -124,8 +140,11 @@ impl WsManager {
                 // Fixed: Added explicit () return type via turbofish
                 conn.publish::<_, _, ()>("fr-ws", payload).await?;
             }
+        } else {
+            return Ok(false);
         }
-        Ok(())
+
+        Ok(true)
     }
 
     // 7. "drop_user" remove user from redis and local sessions
