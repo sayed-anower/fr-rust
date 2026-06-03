@@ -15,41 +15,12 @@ pub mod server;
 pub mod types;
 pub mod utils;
 pub mod ws;
+pub use actix_web::main;
 
 // ==========================================
 // 2. The Framework Prelude
 // ==========================================
 pub mod prelude {
-
-    // --------------------------------------
-    // External Re-exports
-    // --------------------------------------
-    
-    pub use actix_ws;
-    pub use aes_gcm;
-    pub use anyhow; 
-    pub use argon2;
-    pub use base64; 
-    pub use dashmap; 
-    pub use dotenvy::{self, dotenv}; 
-    pub use serde::{self, Deserialize, Serialize}; 
-    pub use serde_json::{self, json}; 
-    pub use tokio; 
-    pub use deadpool_postgres;
-    pub use tokio_postgres;
-    pub use deadpool_redis::{self, redis::AsyncCommands};
-    pub use futures_util::{self, StreamExt};
-    pub use actix_multipart::{self, Multipart};
-    pub use actix_web::{
-        self, delete, get, patch, post, put, rt, web, App, HttpRequest, HttpServer, Responder, main,
-        web::{Form, Json, Path, Payload, Query, ServiceConfig, Data as AppData},
-    };
-    pub use hmac;
-    pub use sha2;
-    pub use rand;
-    pub use lettre;
-    pub use uuid; 
-
     // --------------------------------------
     // Standard Library Re-exports
     // --------------------------------------
