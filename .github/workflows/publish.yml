@@ -2,7 +2,7 @@ name: Publish to crates.io
 
 on:
   push:
-    # branches: [ "main" ]
+    branches: [ "main" ]
     tags:
       - 'v*'
 env:
