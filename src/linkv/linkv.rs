@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use rand::RngCore;
+use rand::Rng;
 use deadpool_redis::redis::AsyncCommands; 
 #[derive(Clone)]
 pub struct LinkVConfig {
@@ -19,7 +19,7 @@ impl LinkV {
     }
     pub async fn generate_token(&self, user_id: &str) -> anyhow::Result<String> {
         let mut token_bytes = vec![0u8; 256];
-        rand::thread_rng().fill_bytes(&mut token_bytes);
+        rand::rng().fill_bytes(&mut token_bytes);
         let token = hex::encode(token_bytes);
         let redis_key = format!("linkv:verify:{}:{}", user_id, token);
         

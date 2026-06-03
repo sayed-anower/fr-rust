@@ -10,7 +10,7 @@ use argon2::{
     Argon2,
 };
 use base64::{engine::general_purpose, Engine as _};
-use rand::RngCore;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use tokio::task;
 
@@ -49,7 +49,7 @@ impl CryptoService {
     /// Purely CPU-bound and fast: Kept synchronous to avoid async executor overhead.
     pub fn encrypt_text(&self, text: &str) -> Result<EncryptedData> {
         let mut nonce_bytes = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut nonce_bytes);
+        rand::rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         // Encrypt the data
