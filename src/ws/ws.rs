@@ -5,7 +5,6 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use thiserror::Error;
 use tokio::sync::mpsc;
 
 // 1. Define the custom error enum using thiserror

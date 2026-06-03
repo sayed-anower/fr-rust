@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use rand::Rng;
 use deadpool_redis::redis::AsyncCommands;
-use thiserror::Error;
 use crate::crypto::crypto::CryptoError;
 
 // --- ERROR HANDLING ---
