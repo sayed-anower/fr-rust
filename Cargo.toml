@@ -14,6 +14,7 @@ categories = ["web-programming", "asynchronous"]
 [dependencies]
 # Core Async, Error, Data structures
 tokio = { version = "1.52", features = ["full"] }
+# anyhow = "1.0"
 thiserror = "2.0"
 dashmap = "6.2"
 dotenvy = "0.15"
@@ -39,7 +40,7 @@ deadpool-postgres = "0.14"
 deadpool-redis = "0.23"
 
 # Cryptography & Security
-argon2 = "0.5"
+argon2 = { version = "0.5.0", features = ["std"] }
 aes-gcm = "0.10"
 hmac = "0.12"
 sha2 = "0.10"

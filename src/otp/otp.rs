@@ -1,6 +1,25 @@
 use crate::prelude::*;
 use rand::Rng;
 use deadpool_redis::redis::AsyncCommands;
+use thiserror::Error;
+
+// --- ERROR HANDLING ---
+
+#[derive(Error, Debug)]
+pub enum OtpError {
+    #[error("Redis command error: {0}")]
+    Redis(#[from] deadpool_redis::redis::RedisError),
+
+    #[error("Redis pool error: {0}")]
+    RedisPool(#[from] deadpool_redis::PoolError),
+
+    #[error("Cryptography service error: {0}")]
+    Crypto(#[from] CryptoError), // Assuming CryptoError is the name of your error enum from earlier
+}
+
+pub type Result<T> = std::result::Result<T, OtpError>;
+
+// --- SERVICE IMPLEMENTATION ---
 
 #[derive(Clone)]
 pub struct OtpConfig {
@@ -20,7 +39,7 @@ impl OtpService {
         Self { config }
     }
 
-    pub async fn generate_otp(&self, user_id: &str, digits: u32) -> anyhow::Result<String> {
+    pub async fn generate_otp(&self, user_id: &str, digits: u32) -> Result<String> {
         let otp = Self::random_digits(digits);
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
         let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
@@ -33,7 +52,7 @@ impl OtpService {
         Ok(otp)
     }
 
-    pub async fn verify_otp(&self, user_id: &str, otp: &str) -> anyhow::Result<bool> {
+    pub async fn verify_otp(&self, user_id: &str, otp: &str) -> Result<bool> {
         let redis_key = format!("otp:{}", user_id);
         
         let mut con = self.config.redis.get_connection().await?;

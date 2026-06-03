@@ -1,6 +1,23 @@
 use crate::prelude::*;
 use rand::Rng;
 use deadpool_redis::redis::AsyncCommands; 
+use thiserror::Error;
+
+// --- ERROR HANDLING ---
+
+#[derive(Error, Debug)]
+pub enum LinkVError {
+    #[error("Redis command error: {0}")]
+    Redis(#[from] deadpool_redis::redis::RedisError),
+
+    #[error("Redis pool error: {0}")]
+    RedisPool(#[from] deadpool_redis::PoolError),
+}
+
+pub type Result<T> = std::result::Result<T, LinkVError>;
+
+// --- SERVICE IMPLEMENTATION ---
+
 #[derive(Clone)]
 pub struct LinkVConfig {
     pub secret: String,
@@ -8,6 +25,7 @@ pub struct LinkVConfig {
     pub redis: RedisManager,
     pub ttl_secs: u64,
 }
+
 #[derive(Clone)]
 pub struct LinkV {
     config: LinkVConfig,
@@ -17,7 +35,8 @@ impl LinkV {
     pub fn new(config: LinkVConfig) -> Self {
         Self { config }
     }
-    pub async fn generate_token(&self, user_id: &str) -> anyhow::Result<String> {
+
+    pub async fn generate_token(&self, user_id: &str) -> Result<String> {
         let mut token_bytes = vec![0u8; 256];
         rand::rng().fill_bytes(&mut token_bytes);
         let token = hex::encode(token_bytes);
@@ -31,7 +50,7 @@ impl LinkV {
         Ok(token)
     }
 
-    pub async fn verify_token(&self, user_id: &str, token: &str) -> anyhow::Result<bool> {
+    pub async fn verify_token(&self, user_id: &str, token: &str) -> Result<bool> {
         let redis_key = format!("linkv:verify:{}:{}", user_id, token);
         
         let mut con = self.config.redis.get_connection().await?;
@@ -45,5 +64,4 @@ impl LinkV {
             Ok(false)
         }
     }
-
 }
