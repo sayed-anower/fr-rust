@@ -54,10 +54,10 @@ pub async fn upload_file<P: AsRef<Path>>(mut payload: Multipart, target_dir: P) 
     while let Ok(Some(mut field)) = payload.try_next().await {
         let content_disposition = field.content_disposition();
         let filename = field
-            .content_disposition()
-            .as_ref()
-            .and_then(|cd| cd.get_filename())
-            .map_or_else(|| "unknown".to_string(), |f| f.to_string());
+        .content_disposition()
+        .as_ref()
+        .and_then(|cd| cd.get_filename())
+        .map_or_else(|| "unknown".to_string(), |f| f.to_string());
 
         
         // Safely join the target directory with the filename (handles OS slashes automatically)

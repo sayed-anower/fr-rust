@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use rand::{rngs::OsRng, RngCore};
 use deadpool_redis::redis::AsyncCommands;
+
 #[derive(Clone)]
 pub struct OtpConfig {
     pub secret: String,
@@ -8,6 +9,7 @@ pub struct OtpConfig {
     pub redis: RedisManager,
     pub ttl_secs: u64,
 }
+
 #[derive(Clone)]
 pub struct OtpService {
     config: OtpConfig,
@@ -18,7 +20,7 @@ impl OtpService {
         Self { config }
     }
 
-        pub async fn generate_otp(&self, user_id: &str, digits: u32) -> anyhow::Result<String> {
+    pub async fn generate_otp(&self, user_id: &str, digits: u32) -> anyhow::Result<String> {
         let otp = Self::random_digits(digits);
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
         let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
@@ -47,7 +49,6 @@ impl OtpService {
         let ok = calculated_hash == hash_to_check;
         
         if ok {
-            // Explicitly annotate here as well
             let _res: () = con.del(&redis_key).await?;
         }
         
@@ -56,7 +57,10 @@ impl OtpService {
 
     fn random_digits(digits: u32) -> String {
         let mut bytes = [0u8; 8];
-        OsRng.fill_bytes(&mut bytes);
+        // FIX: Create a mutable instance of OsRng to call fill_bytes on
+        let mut os_rng = OsRng;
+        os_rng.fill_bytes(&mut bytes);
+        
         let num = u64::from_le_bytes(bytes);
         let otp = num % 10u64.pow(digits);
         format!("{:0width$}", otp, width = digits as usize)
