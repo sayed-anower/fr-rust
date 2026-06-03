@@ -5,14 +5,19 @@ use thiserror::Error;
 
 // --- ERROR HANDLING ---
 
-#[derive(Error, Debug)]
+// Add the import to your path where RedisManagerError is defined
+#[derive(thiserror::Error, Debug)]
 pub enum LinkVError {
-    #[error("Redis command error: {0}")]
+    #[error("Redis manager error: {0}")]
+    RedisManager(#[from] RedisManagerError),
+
+    #[error("Redis error: {0}")]
     Redis(#[from] deadpool_redis::redis::RedisError),
 
     #[error("Redis pool error: {0}")]
     RedisPool(#[from] deadpool_redis::PoolError),
 }
+
 
 pub type Result<T> = std::result::Result<T, LinkVError>;
 

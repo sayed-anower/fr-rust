@@ -14,7 +14,6 @@ categories = ["web-programming", "asynchronous"]
 [dependencies]
 # Core Async, Error, Data structures
 tokio = { version = "1.52", features = ["full"] }
-# anyhow = "1.0"
 thiserror = "2.0"
 dashmap = "6.2"
 dotenvy = "0.15"

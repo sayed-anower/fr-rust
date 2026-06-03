@@ -5,18 +5,21 @@ use thiserror::Error;
 use crate::crypto::crypto::CryptoError;
 
 // --- ERROR HANDLING ---
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum OtpError {
-    #[error("Redis command error: {0}")]
+    #[error("Redis manager error: {0}")]
+    RedisManager(#[from] RedisManagerError),
+
+    #[error("Redis error: {0}")]
     Redis(#[from] deadpool_redis::redis::RedisError),
 
     #[error("Redis pool error: {0}")]
     RedisPool(#[from] deadpool_redis::PoolError),
 
-    #[error("Cryptography service error: {0}")]
-    Crypto(#[from] CryptoError), // Assuming CryptoError is the name of your error enum from earlier
+    #[error("Crypto error: {0}")]
+    Crypto(#[from] CryptoError),
 }
+
 
 pub type Result<T> = std::result::Result<T, OtpError>;
 

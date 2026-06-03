@@ -36,7 +36,7 @@ pub mod prelude {
     pub use crate::jwt::{self, Jwt};
     pub use crate::linkv::{self, LinkV, LinkVConfig};
     pub use crate::otp::{self, OtpConfig, OtpService};
-    pub use crate::redis::{self, RedisManager};
+    pub use crate::redis::{self, RedisManager, RedisManagerError};
     pub use crate::res::{
         self, http_bad, http_bad_json, http_ok, http_ok_json, send_file, send_json, send_str,
         upload_file,

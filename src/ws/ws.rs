@@ -9,17 +9,19 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 
 // 1. Define the custom error enum using thiserror
-#[derive(Error, Debug)]
+
+#[derive(thiserror::Error, Debug)]
 pub enum WsError {
-    #[error("Redis command error: {0}")]
+    #[error("Redis manager error: {0}")]
+    RedisManager(#[from] RedisManagerError),
+
+    #[error("Redis error: {0}")]
     Redis(#[from] deadpool_redis::redis::RedisError),
 
-    // Assuming self.redis.get_connection() returns a deadpool_redis::PoolError. 
-    // If RedisManager uses a different error, you can swap this type.
     #[error("Redis pool error: {0}")]
     RedisPool(#[from] deadpool_redis::PoolError),
 
-    #[error("JSON serialization/deserialization error: {0}")]
+    #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 }
 
