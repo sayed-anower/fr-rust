@@ -21,6 +21,7 @@ jobs:
 
       - name: A Safety Check
         run: cargo check --workspace --all-targets
-
+      - name: Log in to crates.io
+        run: cargo login --token ${{ secrets.IO_TOKEN }}
       - name: Publish Crate
-        run: cargo publish --token ${{ secrets.IO_TOKEN }}
+        run: cargo publish
