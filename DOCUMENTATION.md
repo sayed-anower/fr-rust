@@ -136,6 +136,7 @@ async fn test_responses(path: Path<String>) -> Rsp {
 ```
 ## 4. WebSockets
 Built on top of actix-ws, the WebSocket manager (WsManager) provides robust room management and messaging utilities.
+Access via AppData<WsManager>.
 **Core Methods:**
 ```rust
 // Use actix-ws with this manager
@@ -235,6 +236,7 @@ while let Some(msg) = stream.next().await {
 ```
 ## 7. Verification & Notification Services
 ### 7.1 JSON Web Tokens (JWT)
+Access via AppData<Jwt>.
 ```rust
 let user_id = "user_12345";
 
@@ -269,7 +271,6 @@ let user_id = "user_12345";
 
 let expiring_token = linkv_service
     .generate_token(user_id, 300) // 300 sec validity_time 
-    .await
     .expect("Failed to generate expiring token");
     
 // Let's test the token we generated above
