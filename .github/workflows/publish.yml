@@ -21,12 +21,8 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Run Cargo Check
+      - name: A Safety Check
         run: cargo check --workspace --all-targets
 
-      - name: Log in to crates.io
-        run: cargo login ${{ secrets.IO_TOKEN }}
-
-      - name: Publish Crates
-        run: |
-          cargo publish -p fr-rust
+      - name: Publish to crates.io
+        run: cargo publish ${{ secrets.IO_TOKEN }}
