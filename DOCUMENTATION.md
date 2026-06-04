@@ -23,7 +23,8 @@ async fn main() -> MainRlt {
         .build();
 
     // 3. Initialize Shared Services
-    let jwt = Jwt::new();
+    let jwt_secret = env_var("JWT_SECRET");
+    let jwt = Jwt::new(jwt_secret);
     
     let email_config = EmailConfig {
         smtp_host: env_var("SMTP_HOST"),
@@ -46,14 +47,12 @@ async fn main() -> MainRlt {
         secret: env_var("KEY"),
         crypto: crypto_service.clone(),
         redis: redis.clone(),
-        ttl_secs: 300 
     });
     
     let linkv_service = LinkV::new(LinkVConfig {
         secret: env_var("KEY"),
         crypto: crypto_service.clone(),
         redis: redis.clone(),
-        ttl_secs: 300 
     });
     
     let ws = WsManager::new(WsConfig { server: 1, redis: redis.clone() });
@@ -237,25 +236,28 @@ while let Some(msg) = stream.next().await {
 ## 7. Verification & Notification Services
 ### 7.1 JSON Web Tokens (JWT)
 ```rust
-let secret = "my_ultra_secure_secret_key_2026";
 let user_id = "user_12345";
 
 // Generate token (No expiration)
-let forever_token = jwt.generate_token(user_id, secret).unwrap();
+let forever_token = jwt.generate_token(user_id).unwrap();
 
 // Generate token (Expiring)
 let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as usize;
 let expiry_timestamp = current_time + 3600; // 1 hour from now
-let expiring_token = jwt.generate_exp_token(user_id, secret, expiry_timestamp).unwrap();
+// Generate the token 
+let expiring_token = jwt.generate_exp_token(user_id, expiry_timestamp).unwrap();
 
 // Verify
-let is_valid = jwt.verify_token(&forever_token, secret);
+let is_valid = jwt.verify_token(&forever_token);
+
+// Parse Token
+let real_user_id = jwt.parse_token(expiring_token).unwrap();
 
 ```
 ### 7.2 OTP Generation & Verification
 Access via AppData<OtpService>.
 ```rust
-let otp = otp_service.generate_otp("user123", 6).await.unwrap(); // 6-digit OTP
+let otp = otp_service.generate_otp("user123", 6, 300).await.unwrap(); // 6-digit OTP, 300 second validity_time
 if otp_service.verify_otp("user123", &otp).await.unwrap() {
     http_ok("Valid OTP!")
 }
@@ -264,11 +266,21 @@ if otp_service.verify_otp("user123", &otp).await.unwrap() {
 ### 7.3 Link Verification Tokens
 Access via AppData<LinkV>.
 ```rust
-let token = linkv_service.generate_token("user123").await.unwrap();
-if linkv_service.verify_token("user123", &token).await.unwrap() {
-    http_ok("Valid Token!")
-}
+let user_id = "user_12345";
 
+let expiring_token = linkv_service
+    .generate_token(user_id, 300) // 300 sec validity_time 
+    .await
+    .expect("Failed to generate expiring token");
+    
+// Let's test the token we generated above
+let verification_result = linkv_service.verify_token(user_id, &expiring_token).await.unwrap(); 
+
+if let Ok(returned_token) = verification_result {
+    println!("Valid: {}", returned_token);
+} else {
+    println!("Invalid token");
+}
 ```
 ### 7.4 Email Service
 Access via AppData<EmailService>.
@@ -320,3 +332,9 @@ let name = input("What's your name? ");
 // Generate a random HEX-encoded key of a specific byte length
 let key = generate_key(100); // 100 character random string
 ```
+
+### Important Note Regarding Error Handling
+While you may encounter .unwrap() used in various code examples, **it should not be used in production environments.** Always ensure that errors are handled gracefully and explicitly to maintain the stability and reliability of your application.
+### Contact Us
+If you have any questions or would like to get in touch:
+ * **Email:** sayed.anower.17.2@gmail.com

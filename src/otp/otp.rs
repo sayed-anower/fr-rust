@@ -29,7 +29,6 @@ pub struct OtpConfig {
     pub secret: String,
     pub crypto: CryptoService,
     pub redis: RedisManager,
-    pub ttl_secs: u64,
 }
 
 #[derive(Clone)]
@@ -42,7 +41,7 @@ impl OtpService {
         Self { config }
     }
 
-    pub async fn generate_otp(&self, user_id: &str, digits: u32) -> Result<String> {
+    pub async fn generate_otp(&self, user_id: &str, digits: u32, expiry_time: u32) -> Result<String> {
         let otp = Self::random_digits(digits);
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
         let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;
@@ -50,7 +49,7 @@ impl OtpService {
         
         let mut con = self.config.redis.get_connection().await?;
         
-        let _res: () = con.set_ex(&redis_key, &hash, self.config.ttl_secs).await?;
+        let _res: () = con.set_ex(&redis_key, &hash, expiry_time).await?;
         
         Ok(otp)
     }

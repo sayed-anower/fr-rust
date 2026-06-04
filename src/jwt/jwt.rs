@@ -2,60 +2,78 @@ use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, D
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    sub: String,
+pub struct Claims {
+    pub sub: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    exp: Option<usize>,
+    pub exp: Option<usize>,
 }
 
 #[derive(Clone)]
-pub struct Jwt;
+pub struct Jwt {
+    secret: String,
+}
 
 impl Jwt {
     // Create a new instance
-    pub fn new() -> Self {
-        Jwt
+    pub fn new(secret: String) -> Self {
+        Jwt { secret }
     }
 
-    // Generate a standard token (lives forever, stateless)
-    pub fn generate_token(&self, user_id: &str, secret: &str) -> Result<String, jsonwebtoken::errors::Error> {
+    // 1. Modified: Removed 'secret' from params, uses self.secret instead
+    pub fn generate_token(&self, key: &str) -> Result<String, jsonwebtoken::errors::Error> {
         let claims = Claims {
-            sub: user_id.to_owned(),
+            sub: key.to_owned(),
             exp: None,
         };
         encode(
             &Header::default(),
             &claims,
-            &EncodingKey::from_secret(secret.as_bytes()),
+            &EncodingKey::from_secret(self.secret.as_bytes()),
         )
     }
 
     // Generate a token with a custom expiration timestamp
-    pub fn generate_exp_token(&self, user_id: &str, secret: &str, exp: usize) -> Result<String, jsonwebtoken::errors::Error> {
+    pub fn generate_exp_token(&self, key: &str, exp: usize) -> Result<String, jsonwebtoken::errors::Error> {
         let claims = Claims {
-            sub: user_id.to_owned(),
+            sub: key.to_owned(),
             exp: Some(exp),
         };
 
         encode(
             &Header::default(),
             &claims,
-            &EncodingKey::from_secret(secret.as_bytes()),
+            &EncodingKey::from_secret(self.secret.as_bytes()),
         )
     }
 
     // Verify the token and return a boolean (true/false)
-    pub fn verify_token(&self, token: &str, secret: &str) -> bool {
+    // Modified: Fixed 'secret' variable error, now uses self.secret
+    pub fn verify_token(&self, token: &str) -> bool {
         let mut validation = Validation::new(Algorithm::HS256);
-        
         validation.validate_exp = false; 
 
         let result = decode::<Claims>(
             token,
-            &DecodingKey::from_secret(secret.as_bytes()),
+            &DecodingKey::from_secret(self.secret.as_bytes()),
             &validation,
         );
 
         result.is_ok()
+    }
+
+    // 2. Added: parse_token to convert tokens back to the real Claims content
+    pub fn parse_token(&self, token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+        let mut validation = Validation::new(Algorithm::HS256);
+        // Turn off expiration check here as well, matching your verify_token logic. 
+        // If you want expiration to trigger an error, change this to true.
+        validation.validate_exp = false; 
+
+        let token_data = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(self.secret.as_bytes()),
+            &validation,
+        )?;
+
+        Ok(token_data.claims)
     }
 }

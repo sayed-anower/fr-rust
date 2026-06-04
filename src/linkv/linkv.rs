@@ -1,10 +1,9 @@
 use crate::prelude::*;
-use rand::Rng;
+use std::time::{SystemTime, UNIX_EPOCH};
 use deadpool_redis::redis::AsyncCommands; 
 
 // --- ERROR HANDLING ---
 
-// Add the import to your path where RedisManagerError is defined
 #[derive(thiserror::Error, Debug)]
 pub enum LinkVError {
     #[error("Redis manager error: {0}")]
@@ -15,8 +14,11 @@ pub enum LinkVError {
 
     #[error("Redis pool error: {0}")]
     RedisPool(#[from] deadpool_redis::PoolError),
+    
+    // Added in case JWT parsing/generation fails internally
+    #[error("JWT error: {0}")]
+    JwtError(String), 
 }
-
 
 pub type Result<T> = std::result::Result<T, LinkVError>;
 
@@ -28,6 +30,7 @@ pub struct LinkVConfig {
     pub crypto: CryptoService,
     pub redis: RedisManager,
     pub ttl_secs: u64,
+    pub jwt: Jwt,
 }
 
 #[derive(Clone)]
@@ -40,32 +43,50 @@ impl LinkV {
         Self { config }
     }
 
-    pub async fn generate_token(&self, user_id: &str) -> Result<String> {
-        let mut token_bytes = vec![0u8; 256];
-        rand::rng().fill_bytes(&mut token_bytes);
-        let token = hex::encode(token_bytes);
-        let redis_key = format!("linkv:verify:{}:{}", user_id, token);
+    /// Generates a token using JWT. If `expiring` is true, it sets an expiration timestamp.
+    /// It also tracks the token in Redis for verification.
+    pub async fn generate_token(&self, user_id: &str, expiry_time: u32) -> Result<String> {
+        // 1. Calculate the absolute timestamp using the provided expiry_time (in seconds)
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| LinkVError::JwtError(e.to_string()))?
+            .as_secs() as usize;
         
+        let expiry_timestamp = current_time + expiry_time as usize;
+        
+        // 2. Generate the token using your JWT service
+        let token = self.config.jwt.generate_exp_token(user_id, expiry_timestamp)
+            .map_err(|e| LinkVError::JwtError(format!("{:?}", e)))?;
+    
+        // 3. Unique Redis key combining user and the specific token
+        let redis_key = format!("linkv:verify:{}:{}", user_id, token);
         let mut con = self.config.redis.get_connection().await?;
         
-        // Force the type system to register the output as ()
-        let _res: () = con.set_ex(&redis_key, "1", self.config.ttl_secs).await?;
+        // 4. Force the type system to register the output as ()
+        // We use the same expiry_time (converted to u64) for the Redis key TTL
+        let _res: () = con.set_ex(&redis_key, "1", expiry_time as u64).await?;
         
         Ok(token)
     }
 
-    pub async fn verify_token(&self, user_id: &str, token: &str) -> Result<bool> {
+    /// Verifies the token. If valid, deletes it from Redis (one-time use) and returns the token itself.
+    /// If invalid, returns false.
+    pub async fn verify_token(&self, user_id: &str, token: &str) -> Result<Result<String, bool>> {
+        // 1. Verify structural/signature integrity via JWT first
+        if !self.config.jwt.verify_token(token) {
+            return Ok(Err(false));
+        }
+        // 2. Check Redis blocklist / whitelist status
         let redis_key = format!("linkv:verify:{}:{}", user_id, token);
-        
         let mut con = self.config.redis.get_connection().await?;
         let is_valid: bool = con.exists(&redis_key).await?;
         
         if is_valid {
-            // Force the type system to register the output as ()
             let _res: () = con.del(&redis_key).await?;
-            Ok(true)
+            // Returns the token on success as requested
+            Ok(Ok(token.to_string())) 
         } else {
-            Ok(false)
+            Ok(Err(false))
         }
     }
 }
