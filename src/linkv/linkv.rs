@@ -23,7 +23,7 @@ pub enum LinkVError {
     InvalidToken,
 }
 
-pub type Result = std::result::Result<String, LinkVError>;
+pub type Result<T> = std::result::Result<T, LinkVError>;
 
 // --- SERVICE IMPLEMENTATION ---
 
