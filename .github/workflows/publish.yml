@@ -14,10 +14,8 @@ jobs:
     name: Publish Crate
     runs-on: ubuntu-latest
     
-    # 1. Tells GitHub to use the 'production' environment settings
     environment: production
 
-    # 2. Grants permission to generate the OIDC token for crates.io
     permissions:
       contents: read
       id-token: write
@@ -35,6 +33,5 @@ jobs:
     - name: Verify package layout and validity
       run: cargo package --verbose
 
-    # 3. Explicitly passes the system OIDC token to handle trusted publishing smoothly
     - name: Publish to crates.io
-      run: cargo publish --token ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+      uses: katyo/publish-crates@v2
