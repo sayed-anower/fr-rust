@@ -24,5 +24,10 @@ jobs:
       - name: A Safety Check
         run: cargo check --workspace --all-targets
 
-      - name: Publish to crates.io
-        run: cargo publish ${{ secrets.IO_TOKEN }}
+      - name: Publish Crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.IO_TOKEN }}
+        run: |
+          for crate in $(cargo metadata --format-version 1 | jq -r '.workspace_members[]' | cut -d' ' -f1); do
+            cargo publish -p "$crate" --allow-dirty || true
+          done
