@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub enum LinkVError {
     #[error("JWT error: {0}")]
     JwtError(String),
-    #[error("Invalid Token: {0}")]
+    #[error("Invalid Token!")]
     InvalidToken
 }
 
