@@ -74,7 +74,7 @@ impl LinkV {
 
     /// Verifies the token. If valid, deletes it from Redis (one-time use) and returns the token itself.
     /// If invalid, returns false.
-    pub async fn verify_token(&self, user_id: &str, token: &str) -> Result {
+    pub async fn verify_token(&self, user_id: &str, token: &str) -> Result<String> {
             // 1. Verify structural/signature integrity via JWT first
             if !self.config.jwt.verify_token(token) {
                 return Err(LinkVError::InvalidToken);
