@@ -2,9 +2,7 @@ name: Publish to crates.io
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branch: main
 
 jobs:
   publish:
@@ -24,10 +22,5 @@ jobs:
       - name: A Safety Check
         run: cargo check --workspace --all-targets
 
-      - name: Publish Crates
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.IO_TOKEN }}
-        run: |
-          for crate in $(cargo metadata --format-version 1 | jq -r '.workspace_members[]' | cut -d' ' -f1); do
-            cargo publish -p "$crate" --allow-dirty || true
-          done
+      - name: Publish Crate
+        run: cargo publish --token ${{ secrets.IO_TOKEN }}
