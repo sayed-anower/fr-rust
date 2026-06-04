@@ -32,7 +32,6 @@ pub struct LinkVConfig {
     pub secret: String,
     pub crypto: CryptoService,
     pub redis: RedisManager,
-    pub ttl_secs: u64,
     pub jwt: Jwt,
 }
 
@@ -48,7 +47,7 @@ impl LinkV {
 
     /// Generates a token using JWT. If `expiring` is true, it sets an expiration timestamp.
     /// It also tracks the token in Redis for verification.
-    pub async fn generate_token(&self, user_id: &str, expiry_time: u32) -> Result<String> {
+    pub async fn generate_token(&self, key: &str, expiry_time: u32) -> Result<String> {
         // 1. Calculate the absolute timestamp using the provided expiry_time (in seconds)
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -58,11 +57,11 @@ impl LinkV {
         let expiry_timestamp = current_time + expiry_time as usize;
         
         // 2. Generate the token using your JWT service
-        let token = self.config.jwt.generate_exp_token(user_id, expiry_timestamp)
+        let token = self.config.jwt.generate_exp_token(key, expiry_timestamp)
             .map_err(|e| LinkVError::JwtError(format!("{:?}", e)))?;
     
         // 3. Unique Redis key combining user and the specific token
-        let redis_key = format!("linkv:verify:{}:{}", user_id, token);
+        let redis_key = format!("linkv:verify:{}:{}", key, token);
         let mut con = self.config.redis.get_connection().await?;
         
         // 4. Force the type system to register the output as ()
@@ -74,14 +73,14 @@ impl LinkV {
 
     /// Verifies the token. If valid, deletes it from Redis (one-time use) and returns the token itself.
     /// If invalid, returns false.
-    pub async fn verify_token(&self, user_id: &str, token: &str) -> Result<String> {
+    pub async fn verify_token(&self, key: &str, token: &str) -> Result<bool> {
             // 1. Verify structural/signature integrity via JWT first
             if !self.config.jwt.verify_token(token) {
-                return Err(LinkVError::InvalidToken);
+                return Err(false);
             }
     
             // 2. Check Redis blocklist / whitelist status
-            let redis_key = format!("linkv:verify:{}:{}", user_id, token);
+            let redis_key = format!("linkv:verify:{}:{}", key, token);
             let mut con = self.config.redis.get_connection().await?;
             
             // Check if the key exists
@@ -91,10 +90,10 @@ impl LinkV {
                 // Delete it so it's strictly one-time use
                 let _res: () = con.del(&redis_key).await?;
                 // Returns the token on success
-                Ok(token.to_string()) 
+                Ok(true) 
             } else {
                 // Key didn't exist or expired in Redis
-                Err(LinkVError::InvalidToken)
+                Err(false)
             }
         }
 }
