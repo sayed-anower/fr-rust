@@ -1,14 +1,14 @@
 [package]
 name = "fr-rust"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 authors = ["Sayed Anower <sayed.anower.17.2@gmail.com>"]
 description = "A comprehensive framework/utility library for Actix-web, Postgres, Redis, and authentication."
 license = "MIT"
 repository = "https://github.com/sayed-anower/fr-rust"
 documentation = "https://docs.rs/fr-rust"
-readme = "DOCUMENTATION.md"
-keywords = ["actix-web", "postgres", "redis", "auth", "websocket"]
+readme = "README.md"
+keywords = ["web", "backend", "redis", "auth", "websocket"]
 categories = ["web-programming", "asynchronous"]
 
 [dependencies]
