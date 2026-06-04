@@ -13,6 +13,8 @@ jobs:
     name: Publish Crate
     runs-on: ubuntu-latest
     
+    environment: production
+
     permissions:
       contents: read
       id-token: write
@@ -32,4 +34,5 @@ jobs:
 
     - name: Publish to crates.io
       run: cargo publish
-
+      env:
+        CARGO_REGISTRY_TOKEN: "oidc_fallback"
