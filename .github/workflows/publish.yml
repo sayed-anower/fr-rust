@@ -29,5 +29,4 @@ jobs:
 
       - name: Publish Crates
         run: |
-          cargo publish -p crate_name_1
-          cargo publish -p crate_name_2
+          cargo publish -p fr-rust
