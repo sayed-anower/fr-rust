@@ -41,7 +41,7 @@ impl OtpService {
         Self { config }
     }
 
-    pub async fn generate_otp(&self, user_id: &str, digits: u32, expiry_time: u32) -> Result<String> {
+    pub async fn generate_otp(&self, user_id: &str, digits: u32, expiry_time: u64) -> Result<String> {
         let otp = Self::random_digits(digits);
         let content_to_hash = format!("{}:{}", self.config.secret, otp);
         let hash = self.config.crypto.sha256_hash(&content_to_hash)?.hash;

@@ -257,7 +257,7 @@ let real_user_id = jwt.parse_token(expiring_token).unwrap();
 ### 7.2 OTP Generation & Verification
 Access via AppData<OtpService>.
 ```rust
-let otp = otp_service.generate_otp("user123", 6, 300).await.unwrap(); // 6-digit OTP, 300 second validity_time
+let otp = otp_service.generate_otp("user123", 6, 300).await.unwrap(); // 6-digit OTP, 300 second expiry_time
 if otp_service.verify_otp("user123", &otp).await.unwrap() {
     http_ok("Valid OTP!")
 }

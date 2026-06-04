@@ -15,12 +15,15 @@ pub enum LinkVError {
     #[error("Redis pool error: {0}")]
     RedisPool(#[from] deadpool_redis::PoolError),
     
-    // Added in case JWT parsing/generation fails internally
     #[error("JWT error: {0}")]
     JwtError(String), 
+
+    // --- ADD THIS VARIANT ---
+    #[error("Invalid or expired token")]
+    InvalidToken,
 }
 
-pub type Result<T> = std::result::Result<T, LinkVError>;
+pub type Result = std::result::Result<String, LinkVError>;
 
 // --- SERVICE IMPLEMENTATION ---
 
@@ -71,22 +74,27 @@ impl LinkV {
 
     /// Verifies the token. If valid, deletes it from Redis (one-time use) and returns the token itself.
     /// If invalid, returns false.
-    pub async fn verify_token(&self, user_id: &str, token: &str) -> Result<Result<String, bool>> {
-        // 1. Verify structural/signature integrity via JWT first
-        if !self.config.jwt.verify_token(token) {
-            return Ok(Err(false));
+    pub async fn verify_token(&self, user_id: &str, token: &str) -> Result {
+            // 1. Verify structural/signature integrity via JWT first
+            if !self.config.jwt.verify_token(token) {
+                return Err(LinkVError::InvalidToken);
+            }
+    
+            // 2. Check Redis blocklist / whitelist status
+            let redis_key = format!("linkv:verify:{}:{}", user_id, token);
+            let mut con = self.config.redis.get_connection().await?;
+            
+            // Check if the key exists
+            let is_valid: bool = con.exists(&redis_key).await?;
+            
+            if is_valid {
+                // Delete it so it's strictly one-time use
+                let _res: () = con.del(&redis_key).await?;
+                // Returns the token on success
+                Ok(token.to_string()) 
+            } else {
+                // Key didn't exist or expired in Redis
+                Err(LinkVError::InvalidToken)
+            }
         }
-        // 2. Check Redis blocklist / whitelist status
-        let redis_key = format!("linkv:verify:{}:{}", user_id, token);
-        let mut con = self.config.redis.get_connection().await?;
-        let is_valid: bool = con.exists(&redis_key).await?;
-        
-        if is_valid {
-            let _res: () = con.del(&redis_key).await?;
-            // Returns the token on success as requested
-            Ok(Ok(token.to_string())) 
-        } else {
-            Ok(Err(false))
-        }
-    }
 }
