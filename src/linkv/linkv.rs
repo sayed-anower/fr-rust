@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use std::time::{SystemTime, UNIX_EPOCH};
-use deadpool_redis::redis::AsyncCommands; 
 
 // --- ERROR HANDLING ---
 
@@ -8,6 +7,8 @@ use deadpool_redis::redis::AsyncCommands;
 pub enum LinkVError {
     #[error("JWT error: {0}")]
     JwtError(String)
+    #[error("Invalid Token: {0}")]
+    InvalidToken
 }
 
 pub type Result<T> = std::result::Result<T, LinkVError>;
@@ -54,10 +55,9 @@ impl LinkV {
     pub fn verify_token(&self, token: &str) -> Result<bool> {
             // Verify structural/signature integrity via JWT first
             if !self.config.jwt.verify_token(token) {
-                return Ok(true);
+                return Err(LinkVError::InvalidToken);
             } else {
-                return false;
+                return Ok(false);
             }
-
         }
 }
