@@ -12,6 +12,10 @@ jobs:
   publish:
     name: Publish Crate
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
     - name: Checkout source code
@@ -28,3 +32,4 @@ jobs:
 
     - name: Publish to crates.io
       run: cargo publish
+
