@@ -3,7 +3,8 @@
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[A DOCUMENTATION AVAILABLE HERE!](https://github.com/sayed-anower/docs/blob/9a51a4abfae82bd162fb1ecc90e46de98900c5c1/docs/fr-rust.md)
+📖 **[Read the Documentation](https://github.com/sayed-anower/docs/blob/9a51a4abfae82bd162fb1ecc90e46de98900c5c1/docs/fr-rust.md)**
+
 **FR-RUST** is an ultra-fast, developer-friendly web backend framework for Rust. Built on top of the robust ecosystem of Actix (one of the fastest web servers available), FR-RUST strips away the steep learning curve and verbose boilerplate. It provides an elegant, expressive, and simplified syntax without introducing any performance overhead.
 
 ---
