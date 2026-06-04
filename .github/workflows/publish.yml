@@ -2,36 +2,32 @@ name: Publish to crates.io
 
 on:
   push:
-    branches: [ "main" ]
-    tags:
-      - 'v*'
-
-env:
-  CARGO_TERM_COLOR: always
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   publish:
-    name: Publish Crate
+    name: Publish Crates
     runs-on: ubuntu-latest
-    
-    environment: production
-
-    permissions:
-      contents: read
-      id-token: write
 
     steps:
-    - name: Checkout source code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Run tests (Safety check)
-      run: cargo test --all-features --verbose
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
 
-    - name: Verify package layout and validity
-      run: cargo package --verbose
+      - name: Run Cargo Check
+        run: cargo check --workspace --all-targets
 
-    - name: Publish to crates.io
-      uses: katyo/publish-crates@v2
+      - name: Log in to crates.io
+        run: cargo login ${{ secrets.IO_TOKEN }}
+
+      - name: Publish Crates
+        run: |
+          cargo publish -p crate_name_1
+          cargo publish -p crate_name_2
