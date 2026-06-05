@@ -51,8 +51,7 @@ pub mod prelude {
     };
     pub use crate::macros::{
         self,
-        error::{
-            http_error
-        }
+        http_error,
+        error::*
     };
 }
