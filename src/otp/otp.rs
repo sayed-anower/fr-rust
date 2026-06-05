@@ -78,8 +78,7 @@ impl OtpService {
 
     fn random_digits(digits: u32) -> String {
         let mut bytes = [0u8; 8];
-        
-        // rand::rng() gets the new, optimized cryptographically secure thread-local generator
+
         rand::rng().fill_bytes(&mut bytes);
         
         let num = u64::from_le_bytes(bytes);

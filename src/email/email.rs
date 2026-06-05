@@ -1,12 +1,23 @@
 use lettre::{
-    AsyncSmtpTransport,
-    AsyncTransport,
-    Message,
-    Tokio1Executor,
     message::Mailbox,
-    transport::smtp::authentication::Credentials,
+    transport::smtp::{authentication::Credentials, PoolConfig},
+    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
 use std::sync::Arc;
+use thiserror::Error;
+
+/// Unified error type for email parsing, message building, and SMTP transport.
+#[derive(Debug, Error)]
+pub enum EmailError {
+    #[error("Invalid email address format: {0}")]
+    Address(#[from] lettre::address::AddressError),
+
+    #[error("Failed to construct email message: {0}")]
+    Message(#[from] lettre::error::Error),
+
+    #[error("SMTP transport error: {0}")]
+    Transport(#[from] lettre::transport::smtp::Error),
+}
 
 #[derive(Clone)]
 pub struct EmailService {
@@ -30,19 +41,20 @@ pub struct EmailConfig {
 }
 
 impl EmailService {
-    // Fixed: Changed Result error type to a box/generic error to handle both SMTP and Address parsing errors smoothly
-    pub fn new(email_config: EmailConfig) -> Result<Self, Box<dyn std::error::Error>> {
-        // OPTIMIZATION: Move strings instead of calling .to_owned()
-        let creds = Credentials::new(email_config.smtp_user, email_config.smtp_pass);
+    /// Initializes the EmailService with connection pooling enabled.
+    pub fn new(config: EmailConfig) -> Result<Self, EmailError> {
+        let creds = Credentials::new(config.smtp_user, config.smtp_pass);
 
-        let mailer = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&email_config.smtp_host)?
-            .port(email_config.smtp_port)
+        // Build the mailer with a connection pool to reuse SMTP connections
+        let mailer = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.smtp_host)?
+            .port(config.smtp_port)
             .credentials(creds)
+            .pool_config(PoolConfig::new().max_size(20)) // Adjust pool size based on traffic
             .build();
 
         let from_mailbox = Mailbox::new(
-            Some(email_config.from_name),
-            email_config.from_email.parse()?, // Safe error handling instead of .unwrap()
+            Some(config.from_name),
+            config.from_email.parse()?,
         );
 
         Ok(Self {
@@ -51,16 +63,16 @@ impl EmailService {
         })
     }
 
-    // OPTIMIZATION: Pass data by reference to allow re-use and prevent unnecessary memory shifts
-    pub async fn send_email(&self, data: &EmailData) -> Result<(), Box<dyn std::error::Error>> {
-        // Safe parsing: returns an error instead of crashing if the recipient email is malformed
+    /// Sends an email. Takes ownership of `EmailData` to avoid unnecessary cloning.
+    pub async fn send_email(&self, data: EmailData) -> Result<(), EmailError> {
         let to_address = data.to.parse()?; 
 
+        // Message body consumes the string, so taking `data` by value prevents an extra allocation
         let email = Message::builder()
             .from(self.from.clone())
             .to(to_address)
-            .subject(&data.subject)
-            .body(data.body.clone())?; // Lettre needs to consume the body, so we clone here if passed by ref
+            .subject(data.subject)
+            .body(data.body)?; 
 
         self.mailer.send(email).await?;
 

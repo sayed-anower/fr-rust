@@ -1,7 +1,4 @@
-// ==========================================
-// 1. Module Declarations
-// ==========================================
-
+// Module Declarations
 pub mod crypto;
 pub mod db;
 pub mod ddos;
@@ -13,23 +10,13 @@ pub mod redis;
 pub mod res;
 pub mod server;
 pub mod types;
-pub mod utils;
 pub mod ws;
 pub mod macros;
 pub use actix_web::main;
 
-// ==========================================
-// 2. The Framework Prelude
-// ==========================================
+// The Framework Prelude
 pub mod prelude {
-    // --------------------------------------
-    // Standard Library Re-exports
-    // --------------------------------------
-    pub use std::{collections::HashMap, env, io::Result as IoResult, sync::Arc};
-
-    // --------------------------------------
     // Internal Library Re-exports
-    // --------------------------------------
     pub use crate::crypto::{self, CryptoService};
     pub use crate::db::{self, DbPool};
     pub use crate::ddos::{self, DdosConfig, DdosShield};
@@ -45,10 +32,6 @@ pub mod prelude {
     pub use crate::server::{self, env_var, env_var_or_default, load_env};
     pub use crate::types::{self, FileRlt, MainRlt, Rlt, RltRsp, Rsp, Rqs};
     pub use crate::ws::{self, UserMsg, WsConfig, WsManager};
-    pub use crate::utils::{
-        self,
-        utils::{generate_token, input},
-    };
     pub use crate::{
         http_error,
     };

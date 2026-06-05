@@ -45,20 +45,6 @@ pub enum CryptoError {
 
 pub type Result<T> = std::result::Result<T, CryptoError>;
 
-// --- DATA STRUCTURES ---
-
-pub struct EncryptedData {
-    pub encrypted_text: String,
-}
-
-pub struct DecryptedData {
-    pub text: String,
-}
-
-pub struct HashedData {
-    pub hash: String,
-}
-
 // --- OOP SERVICE ---
 
 #[derive(Clone)]
@@ -68,7 +54,6 @@ pub struct CryptoService {
 
 impl CryptoService {
     /// Constructor: Initializes the AES cipher once.
-    /// Fixes the performance issue of expanding the key schedule on every request.
     pub fn new(encryption_key: &[u8; 32]) -> Result<Self> {
         let cipher = Aes256Gcm::new_from_slice(encryption_key)
             .map_err(|_| CryptoError::InvalidKeyLength)?;
@@ -78,7 +63,7 @@ impl CryptoService {
 
     /// Encrypts plaintext into a base64-encoded string (Nonce + Ciphertext)
     /// Purely CPU-bound and fast: Kept synchronous to avoid async executor overhead.
-    pub fn encrypt_text(&self, text: &str) -> Result<EncryptedData> {
+    pub fn encrypt_text(&self, text: &str) -> Result<String> {
         let mut nonce_bytes = [0u8; 12];
         rand::rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
@@ -94,14 +79,12 @@ impl CryptoService {
         combined.extend_from_slice(&nonce_bytes);
         combined.extend_from_slice(&ciphertext);
 
-        Ok(EncryptedData {
-            encrypted_text: general_purpose::STANDARD.encode(combined),
-        })
+        Ok(general_purpose::STANDARD.encode(combined))
     }
 
     /// Decrypts a base64-encoded string back to plaintext
     /// Purely CPU-bound and fast: Kept synchronous.
-    pub fn decrypt_text(&self, encrypted_text: &str) -> Result<DecryptedData> {
+    pub fn decrypt_text(&self, encrypted_text: &str) -> Result<String> {
         let decoded = general_purpose::STANDARD.decode(encrypted_text)?;
 
         if decoded.len() < 12 {
@@ -124,7 +107,7 @@ impl CryptoService {
 
     /// Hashes a string using SHA-256 and returns a hex-encoded string.
     /// Fast, non-blocking: Kept synchronous.
-    pub fn sha256_hash(&self, data: &str) -> Result<HashedData> {
+    pub fn sha256_hash(&self, data: &str) -> Result<String> {
         let mut hasher = Sha256::new();
         hasher.update(data.as_bytes());
         let result = hasher.finalize();
@@ -132,12 +115,12 @@ impl CryptoService {
         // Format raw bytes directly into a 64-character lowercase hex string
         let hash = format!("{:x}", result);
 
-        Ok(HashedData { hash })
+        Ok(hash)
     }
 
     /// Hashes a string using Argon2.
     /// Heavy CPU/Memory usage: Must remain async and run on a blocking thread pool.
-    pub async fn hash_data(&self, data: &str) -> Result<HashedData> {
+    pub async fn hash_data(&self, data: &str) -> Result<String> {
         let data = data.to_string();
 
         let hash = task::spawn_blocking(move || -> Result<String> {
@@ -151,7 +134,7 @@ impl CryptoService {
         })
         .await??;
 
-        Ok(HashedData { hash })
+        Ok(hash)
     }
 
     /// Verifies a string against an Argon2 hash.
