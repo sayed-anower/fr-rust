@@ -15,6 +15,7 @@ pub mod server;
 pub mod types;
 pub mod utils;
 pub mod ws;
+pub mod macros;
 pub use actix_web::main;
 
 // ==========================================
@@ -47,5 +48,11 @@ pub mod prelude {
     pub use crate::utils::{
         self,
         utils::{generate_token, input},
+    };
+    pub use crate::macros::{
+        self,
+        error::{
+            http_error
+        }
     };
 }
