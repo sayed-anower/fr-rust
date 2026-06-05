@@ -23,7 +23,7 @@ FR-RUST comes pre-packaged with out-of-the-box batteries to accelerate your back
 - **Crypto & Security Suite:** Effortless AES text encryption/decryption and hashing operations.
 - **Expressive Responses:** Clean helpers for JSON, Strings, and HTTP status handling.
 - **Redis Integration:** Fully integrated asynchronous caching and operations manager.
-- **WebSockets:** Blazing-fast real-time bidirectional communication. (Work on progress, not production grade yet!)
+- **WebSockets:** Blazing-fast real-time bidirectional communication.
 
 ---
 
