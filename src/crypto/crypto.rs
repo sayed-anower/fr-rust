@@ -78,8 +78,8 @@ impl CryptoService {
         let mut combined = Vec::with_capacity(12 + ciphertext.len());
         combined.extend_from_slice(&nonce_bytes);
         combined.extend_from_slice(&ciphertext);
-
-        Ok(general_purpose::STANDARD.encode(combined))
+        let encrypt_text = general_purpose::STANDARD.encode(combined);
+        Ok(encrypt_text)
     }
 
     /// Decrypts a base64-encoded string back to plaintext
@@ -99,10 +99,8 @@ impl CryptoService {
             .cipher
             .decrypt(nonce, ciphertext)
             .map_err(|_| CryptoError::DecryptionFailed)?;
-
-        Ok(DecryptedData {
-            text: String::from_utf8(plaintext)?,
-        })
+    let decrypt_text = String::from_utf8(plaintext)?;
+        Ok(decrypt_text)
     }
 
     /// Hashes a string using SHA-256 and returns a hex-encoded string.
