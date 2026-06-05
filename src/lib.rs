@@ -49,9 +49,7 @@ pub mod prelude {
         self,
         utils::{generate_token, input},
     };
-    pub use crate::macros::{
-        self,
+    pub use crate::{
         http_error,
-        error::*
     };
 }
