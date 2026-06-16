@@ -12,7 +12,9 @@ pub mod server;
 pub mod types;
 pub mod ws;
 pub mod macros;
-pub use actix_web::main;
+pub mod req;
+pub mod res;
+use actix_web::main as web_main;
 
 // The Framework Prelude
 pub mod prelude {
@@ -30,9 +32,12 @@ pub mod prelude {
         upload_file,
     };
     pub use crate::server::{self, env_var, env_var_or_default, load_env};
-    pub use crate::types::{self, FileRlt, MainRlt, Rlt, RltRsp, Rsp, Rqs};
+    pub use crate::types::{self, FileRlt, Main, Rlt, RltRsp, Rsp, Rqs};
     pub use crate::ws::{self, UserMsg, WsConfig, WsManager};
     pub use crate::{
-        http_error,
+        err, get, post, put, delete, patch, head, options, scope, resource, run_server
+    };
+    pub use crate::res::{
+        *
     };
 }
