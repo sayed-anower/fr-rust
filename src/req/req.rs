@@ -6,7 +6,7 @@ macro_rules! get {
     };
     // With extra chaining (guard, middleware, etc.)
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::get().to(\( handler). \)($extra)*)
+        $crate::cfg.route($path, ::actix_web::web::get().to($handler).$($extra)*)
     };
 }
 
@@ -16,7 +16,7 @@ macro_rules! post {
         $crate::cfg.route($path, ::actix_web::web::post().to($handler))
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::post().to(\( handler). \)($extra)*)
+        $crate::cfg.route($path, ::actix_web::web::post().to($handler).$($extra)*)
     };
 }
 
@@ -26,7 +26,7 @@ macro_rules! put {
         $crate::cfg.route($path, ::actix_web::web::put().to($handler))
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::put().to(\( handler). \)($extra)*)
+        $crate::cfg.route($path, ::actix_web::web::put().to($handler).$($extra)*)
     };
 }
 
@@ -36,7 +36,7 @@ macro_rules! delete {
         $crate::cfg.route($path, ::actix_web::web::delete().to($handler))
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::delete().to(\( handler). \)($extra)*)
+        $crate::cfg.route($path, ::actix_web::web::delete().to($handler).$($extra)*)
     };
 }
 
@@ -46,7 +46,7 @@ macro_rules! patch {
         $crate::cfg.route($path, ::actix_web::web::patch().to($handler))
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::patch().to(\( handler). \)($extra)*)
+        $crate::cfg.route($path, ::actix_web::web::patch().to($handler).$($extra)*)
     };
 }
 
@@ -56,7 +56,7 @@ macro_rules! head {
         $crate::cfg.route($path, ::actix_web::web::head().to($handler))
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::head().to(\( handler). \)($extra)*)
+        $crate::cfg.route($path, ::actix_web::web::head().to($handler).$($extra)*)
     };
 }
 
@@ -66,24 +66,23 @@ macro_rules! options {
         $crate::cfg.route($path, ::actix_web::web::options().to($handler))
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::options().to(\( handler). \)($extra)*)
+        $crate::cfg.route($path, ::actix_web::web::options().to($handler).$($extra)*)
     };
 }
-
 
 #[macro_export]
 macro_rules! scope {
     ($path:literal, { $($content:tt)* }) => {
         $crate::cfg.service(
             ::actix_web::web::scope($path)
-                $($content)*
+                .$($content)*
         )
     };
     ($path:literal, $($extra:tt)*, { $($content:tt)* }) => {
         $crate::cfg.service(
             ::actix_web::web::scope($path)
-                $($extra)*
-                $($content)*
+                .$($extra)*
+                .$($content)*
         )
     };
 }
@@ -93,14 +92,14 @@ macro_rules! resource {
     ($path:literal, $($content:tt)*) => {
         $crate::cfg.service(
             ::actix_web::web::resource($path)
-                $($content)*
+                .$($content)*
         )
     };
     ($path:literal, $($extra:tt)*, { $($content:tt)* }) => {
         $crate::cfg.service(
             ::actix_web::web::resource($path)
-                $($extra)*
-                $($content)*
+                .$($extra)*
+                .$($content)*
         )
     };
 }

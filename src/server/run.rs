@@ -18,17 +18,21 @@ macro_rules! run_server {
         log::info!("Starting server on {}", bind_addr);
 
         HttpServer::new(move || {
-            App::new()
+            let mut app = App::new()
                 .app_data(web::Data::new($state.clone()))
                 // === Security & Performance Middleware (always included) ===
                 .wrap(NormalizePath::new(TrailingSlash::Trim))
-                .wrap(Compress::default())
-                // User can add more middleware / services / app_data here
-                \( ( \)($app_extra)*)?
-                .configure($config)
+                .wrap(Compress::default());
+            // User can add more middleware / services / app_data here
+            $(
+                app = app $($app_extra)*;
+            )?
+            app.configure($config)
         })
         .bind(bind_addr)?
-        \( ( \)($server_extra)*)?
+        $(
+            .$($server_extra)*
+        )?
         .run()
         .await
     }};

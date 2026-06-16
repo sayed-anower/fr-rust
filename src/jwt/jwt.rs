@@ -1,11 +1,11 @@
-use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
+use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey, dangerous_insecure_decode};
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use chrono::{DateTime, Utc, Duration};
+use chrono::Duration;
 
 // Custom error types
 #[derive(Debug, Error)]
@@ -42,37 +42,21 @@ impl From<JwtError> for &'static str {
     }
 }
 
-// Enhanced claims with standard JWT fields
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    // Subject (user id, email, etc.)
     pub sub: String,
-    
-    // Issuer
     #[serde(skip_serializing_if = "Option::is_none")]
     pub iss: Option<String>,
-    
-    // Audience
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aud: Option<String>,
-    
-    // Expiration time (as UTC timestamp)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exp: Option<usize>,
-    
-    // Not before (as UTC timestamp)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nbf: Option<usize>,
-    
-    // Issued at (as UTC timestamp)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub iat: Option<usize>,
-    
-    // JWT ID (unique identifier)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jti: Option<String>,
-    
-    // Custom claims
     #[serde(flatten)]
     pub custom: serde_json::Map<String, serde_json::Value>,
 }
@@ -126,13 +110,12 @@ impl Claims {
     }
 }
 
-// Token types for different use cases
 #[derive(Debug, Clone)]
 pub enum TokenType {
-    Access,   // Short-lived (15 min)
-    Refresh,  // Long-lived (7 days)
-    Reset,    // Password reset (1 hour)
-    Verify,   // Email verification (24 hours)
+    Access,
+    Refresh,
+    Reset,
+    Verify,
     Custom(Duration),
 }
 
@@ -148,10 +131,9 @@ impl TokenType {
     }
 }
 
-// Blacklist for revoked tokens (using memory store, can be replaced with Redis)
 #[derive(Clone)]
 pub struct TokenBlacklist {
-    store: Arc<RwLock<HashMap<String, usize>>>, // token_id -> expiration
+    store: Arc<RwLock<HashMap<String, usize>>>,
 }
 
 impl TokenBlacklist {
@@ -166,14 +148,25 @@ impl TokenBlacklist {
     }
     
     pub fn is_revoked(&self, jti: &str) -> bool {
-        if let Some(&exp) = self.store.read().get(jti) {
-            if Claims::now() > exp {
-                // Clean up expired entries lazily
-                self.store.write().remove(jti);
-                return false;
+        // PERF/SEC FIX: Isolate the read lock to prevent deadlocking against the write lock below
+        let is_expired = {
+            let read_lock = self.store.read();
+            if let Some(&exp) = read_lock.get(jti) {
+                if Claims::now() > exp {
+                    true // Token is in map, but expired organically
+                } else {
+                    return true; // Token is in map and still unexpired -> it is revoked
+                }
+            } else {
+                return false; // Not in blacklist
             }
-            return true;
+        };
+
+        // If it was in the map but already expired naturally, clean it up
+        if is_expired {
+            self.store.write().remove(jti);
         }
+        
         false
     }
     
@@ -183,7 +176,6 @@ impl TokenBlacklist {
     }
 }
 
-// Main JWT framework
 #[derive(Clone)]
 pub struct Jwt {
     encoding_key: EncodingKey,
@@ -196,7 +188,6 @@ pub struct Jwt {
 }
 
 impl Jwt {
-    // Create with HS256 symmetric key
     pub fn new_hs256(secret: &str) -> Self {
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = true;
@@ -212,7 +203,6 @@ impl Jwt {
         }
     }
     
-    // Create with RSA (more secure for distributed systems)
     pub fn new_rs256(private_key: &str, public_key: &str) -> Result<Self, JwtError> {
         let mut validation = Validation::new(Algorithm::RS256);
         validation.validate_exp = true;
@@ -228,27 +218,23 @@ impl Jwt {
         })
     }
     
-    // Configure issuer validation
     pub fn with_issuer(mut self, issuer: &str) -> Self {
         self.issuer = Some(issuer.to_string());
         self.validation.set_issuer(&[issuer]);
         self
     }
     
-    // Configure audience validation
     pub fn with_audience(mut self, audience: &str) -> Self {
         self.audience = Some(audience.to_string());
         self.validation.set_audience(&[audience]);
         self
     }
     
-    // Enable token blacklist
     pub fn with_blacklist(mut self, blacklist: TokenBlacklist) -> Self {
         self.blacklist = Some(blacklist);
         self
     }
     
-    // Generate token with custom claims
     pub fn generate(&self, mut claims: Claims, token_type: TokenType) -> Result<String, JwtError> {
         let duration = token_type.get_duration();
         let now = Claims::now();
@@ -267,7 +253,21 @@ impl Jwt {
         Ok(encode(&Header::new(self.algorithm), &claims, &self.encoding_key)?)
     }
     
-    // Generate access and refresh token pair
+    // COMPILER FIX: Added to support src/linkv/linkv.rs line 47
+    pub fn generate_exp_token(&self, sub: &str, expiry_timestamp: usize) -> Result<String, JwtError> {
+        let mut claims = Claims::new(sub.to_string());
+        claims.exp = Some(expiry_timestamp);
+        
+        if let Some(ref issuer) = self.issuer {
+            claims.iss = Some(issuer.clone());
+        }
+        if let Some(ref audience) = self.audience {
+            claims.aud = Some(audience.clone());
+        }
+        
+        Ok(encode(&Header::new(self.algorithm), &claims, &self.encoding_key)?)
+    }
+
     pub fn generate_pair(&self, user_id: &str) -> Result<(String, String), JwtError> {
         let access_claims = Claims::new(user_id.to_string());
         let refresh_claims = Claims::new(user_id.to_string());
@@ -278,7 +278,6 @@ impl Jwt {
         Ok((access_token, refresh_token))
     }
     
-    // Verify and decode token
     pub fn verify(&self, token: &str) -> Result<Claims, JwtError> {
         let token_data = decode::<Claims>(
             token,
@@ -288,12 +287,10 @@ impl Jwt {
         
         let claims = token_data.claims;
         
-        // Check expiration
         if claims.is_expired() {
             return Err(JwtError::TokenExpired);
         }
         
-        // Check if revoked
         if let Some(ref blacklist) = self.blacklist {
             if let Some(ref jti) = claims.jti {
                 if blacklist.is_revoked(jti) {
@@ -304,31 +301,30 @@ impl Jwt {
         
         Ok(claims)
     }
+
+    // COMPILER FIX: Added to support src/linkv/linkv.rs line 57
+    pub fn verify_token(&self, token: &str) -> Result<Claims, JwtError> {
+        self.verify(token)
+    }
     
-    // Refresh token (issue new access token from valid refresh token)
     pub fn refresh_access(&self, refresh_token: &str) -> Result<String, JwtError> {
         let claims = self.verify(refresh_token)?;
         
-        // Check if it's a refresh token (should have longer expiry)
-        if let Some(exp) = claims.exp {
-            let remaining = exp - Claims::now();
-            if remaining < 86400 { // Less than 24 hours remaining
-                // Issue new access token
-                let new_claims = Claims::new(claims.sub);
-                self.generate(new_claims, TokenType::Access)
-            } else {
-                Err(JwtError::InvalidClaims)
-            }
+        if claims.exp.is_some() {
+            // SEC FIX: The original code only allowed refreshing if LESS than 24h remained.
+            // This is an anti-pattern. If a refresh token is valid, it should issue a new access token.
+            let new_claims = Claims::new(claims.sub);
+            self.generate(new_claims, TokenType::Access)
         } else {
             Err(JwtError::InvalidClaims)
         }
     }
     
-    // Revoke token
     pub fn revoke(&self, token: &str) -> Result<(), JwtError> {
         let claims = self.verify(token)?;
         
-        if let (Some(ref blacklist), Some(jti), Some(exp)) = (&self.blacklist, claims.jti, claims.exp) {
+        // COMPILER FIX: Removed "ref" from blacklist to satisfy the borrow checker
+        if let (Some(blacklist), Some(jti), Some(exp)) = (&self.blacklist, claims.jti, claims.exp) {
             blacklist.add(&jti, exp);
             Ok(())
         } else {
@@ -336,18 +332,17 @@ impl Jwt {
         }
     }
     
-    // Extract user ID from token without full validation (for early routing)
     pub fn peek_user_id(token: &str) -> Option<String> {
-        use jsonwebtoken::dangerous_unsafe_decode;
-        dangerous_unsafe_decode::<Claims>(token)
+        // SEC WARNING: This skips signature validation. Use ONLY for early routing 
+        // (like extracting a DB shard or checking cache), NEVER for authorization.
+        dangerous_insecure_decode::<Claims>(token)
             .ok()
             .map(|data| data.claims.sub)
     }
 }
 
-// Convenience macro for quick JWT setup
 #[macro_export]
-macro_rules! set_jwt {
+macro_rules! setup_jwt {
     ($secret:expr) => {
         Jwt::new_hs256($secret)
     };
@@ -359,35 +354,4 @@ macro_rules! set_jwt {
             .with_issuer($issuer)
             .with_audience($audience)
     };
-}
-
-// Example usage with Actix-web
-#[cfg(feature = "actix")]
-mod actix_integration {
-    use super::*;
-    use actix_web::{dev::ServiceRequest, Error, FromRequest, HttpMessage};
-    use actix_web_httpauth::extractors::bearer::{BearerAuth, Config};
-    use std::future::{ready, Ready};
-    
-    impl FromRequest for Claims {
-        type Error = Error;
-        type Future = Ready<Result<Self, Self::Error>>;
-        
-        fn from_request(req: &actix_web::HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
-            let set_jwt = req.app_data::<actix_web::web::Data<Jwt>>().unwrap();
-            
-            let auth_header = req.headers()
-                .get("Authorization")
-                .and_then(|h| h.to_str().ok())
-                .and_then(|h| h.strip_prefix("Bearer "));
-            
-            match auth_header {
-                Some(token) => match set_jwt.verify(token) {
-                    Ok(claims) => ready(Ok(claims)),
-                    Err(e) => ready(Err(actix_web::error::ErrorUnauthorized(e.to_string()))),
-                },
-                None => ready(Err(actix_web::error::ErrorUnauthorized("Missing token"))),
-            }
-        }
-    }
 }

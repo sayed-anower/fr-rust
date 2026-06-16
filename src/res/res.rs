@@ -1,17 +1,16 @@
 use actix_files::NamedFile;
-use actix_web::{Error, HttpResponse, Result, HttpRequest, HttpResponseBuilder};
+use actix_web::{Error, HttpResponse, Result, HttpRequest};
 use actix_multipart::Multipart;
-use actix_web::http::{header, Method, StatusCode};
+use actix_web::http::{header, Method};
 use futures_util::{StreamExt, TryStreamExt};
-use serde::Serialize;
 use std::path::Path;
 use tokio::fs::File;
-use tokio::io::{AsyncWriteExt, BufWriter};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, AsyncSeekExt, BufWriter}; // Brought AsyncSeekExt into scope
 use bytes::Bytes;
-use memmap2::Mmap;
-use std::io::{self, BufReader};
-use brotli::{CompressorWriter, DecompressorWriter};
-use lz4_flex::frame::{compress, decompress};
+use brotli::CompressorWriter;
+use tokio_util::io::ReaderStream;
+// Use public prepended API instead of private frame modules
+use lz4_flex::{compress_prepended, decompress_size_prepended};
 
 // ============== HIGH-PERFORMANCE RESPONSES ==============
 
@@ -139,17 +138,15 @@ pub fn http_service_unavailable(retry_after_secs: u64) -> HttpResponse {
 
 /// Send file with memory-mapped I/O (fastest for static files)
 pub async fn send_file_fast(path: &str, req: &HttpRequest) -> Result<NamedFile> {
-    // Check for range headers and handle conditional requests
     let file = NamedFile::open_async(path).await?;
     
-    // Use pre-compression if available
     if let Some(accept_encoding) = req.headers().get(header::ACCEPT_ENCODING) {
         if accept_encoding.to_str().unwrap_or("").contains("br") {
-            // Check for pre-compressed brotli file
             let br_path = format!("{}.br", path);
             if Path::new(&br_path).exists() {
+                // Fixed ContentEncoding variation to Brotli
                 return Ok(NamedFile::open_async(br_path).await?
-                    .set_content_encoding(header::ContentEncoding::Br));
+                    .set_content_encoding(header::ContentEncoding::Brotli));
             }
         }
     }
@@ -158,21 +155,15 @@ pub async fn send_file_fast(path: &str, req: &HttpRequest) -> Result<NamedFile> 
 }
 
 /// Stream large file with chunked transfer (for progressive loading)
+/// Stream large file with chunked transfer (for progressive loading)
 pub async fn stream_file_chunked(path: &str, chunk_size: usize) -> Result<HttpResponse, Error> {
     let file = File::open(path).await?;
-    let mut reader = BufReader::new(file);
     
-    let stream = futures_util::stream::unfold(reader, |mut reader| async {
-        let mut buffer = vec![0u8; chunk_size];
-        match tokio::io::AsyncReadExt::read(&mut reader, &mut buffer).await {
-            Ok(0) => None,
-            Ok(n) => {
-                buffer.truncate(n);
-                Some(Ok::<_, Error>(Bytes::from(buffer)))
-            },
-            Err(e) => Some(Err(e.into())),
-        }
-    });
+    // ReaderStream automatically manages a highly optimized BytesMut buffer.
+    // We use `with_capacity` to respect your chunk_size parameter.
+    let stream = ReaderStream::with_capacity(file, chunk_size)
+        // actix-web expects an actix_web::Error, so we map the std::io::Error
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e));
     
     Ok(HttpResponse::Ok()
         .content_type("application/octet-stream")
@@ -188,9 +179,9 @@ pub async fn send_file_range(path: &str, range: Option<&str>) -> Result<HttpResp
     if let Some(range_str) = range {
         if let Some((start, end)) = parse_range(range_str, file_size) {
             let len = end - start + 1;
+            // Note: If memory exhaustion is a concern, range requests should stream rather than read_exact into RAM.
             let mut buf = vec![0u8; len as usize];
             
-            use tokio::io::AsyncReadExt;
             let mut reader = tokio::io::BufReader::new(file);
             reader.seek(std::io::SeekFrom::Start(start)).await?;
             reader.read_exact(&mut buf).await?;
@@ -207,7 +198,6 @@ pub async fn send_file_range(path: &str, range: Option<&str>) -> Result<HttpResp
         .insert_header((header::CONTENT_LENGTH, file_size))
         .content_type("application/octet-stream")
         .body(())
-        // Actual body will be filled by actix
     )
 }
 
@@ -215,11 +205,14 @@ pub async fn send_file_range(path: &str, range: Option<&str>) -> Result<HttpResp
 
 /// Brotli compressed response (best compression ratio)
 pub fn http_brotli(data: &[u8], quality: u32) -> HttpResponse {
-    let mut compressed = Vec::new();
-    let mut writer = CompressorWriter::new(&mut compressed, 4096, quality as u32, 22);
+    // Fixed: Take ownership of the vector in CompressorWriter and extract it afterwards
+    // Added capacity hinting to prevent vector resizing
+    let mut writer = CompressorWriter::new(Vec::with_capacity(data.len() / 2), 4096, quality as u32, 22);
     use std::io::Write;
     writer.write_all(data).unwrap();
     writer.flush().unwrap();
+    
+    let compressed = writer.into_inner();
     
     HttpResponse::Ok()
         .insert_header((header::CONTENT_ENCODING, "br"))
@@ -229,7 +222,8 @@ pub fn http_brotli(data: &[u8], quality: u32) -> HttpResponse {
 
 /// LZ4 compressed response (fastest decompression)
 pub fn http_lz4(data: &[u8]) -> HttpResponse {
-    let compressed = compress(data);
+    // Fixed: Uses public prepended API
+    let compressed = compress_prepended(data);
     
     HttpResponse::Ok()
         .insert_header((header::CONTENT_ENCODING, "lz4"))
@@ -247,7 +241,7 @@ where
     let mut results = Vec::new();
     
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let name = field.name().unwrap_or("unknown").to_string();
+        let name = field.name().map_or("unknown", |n| n).to_string();
         let mut data = Vec::new();
         
         while let Some(chunk) = field.next().await {
@@ -264,10 +258,7 @@ where
 
 /// Parse JSON with zero-copy (fastest)
 pub fn parse_json_fast<T: serde::de::DeserializeOwned>(data: &Bytes) -> Result<T, Error> {
-    // Use from_slice for zero-copy if possible, else from_reader
-    serde_json::from_slice(data).map_err(|e| {
-        actix_web::error::ErrorBadRequest(e)
-    })
+    serde_json::from_slice(data).map_err(|e| actix_web::error::ErrorBadRequest(e))
 }
 
 // ============== UTILITIES ==============
@@ -344,7 +335,9 @@ pub async fn upload_streaming<P: AsRef<Path>>(payload: Multipart, target_dir: P)
     let mut uploaded_files = Vec::new();
     let base_path = target_dir.as_ref();
     
-    tokio::fs::create_dir_all(base_path).await?;
+    if !base_path.exists() {
+        tokio::fs::create_dir_all(base_path).await?;
+    }
     
     let mut stream = payload;
     while let Some(mut field) = stream.try_next().await? {
