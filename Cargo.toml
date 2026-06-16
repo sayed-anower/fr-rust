@@ -1,6 +1,6 @@
 [package]
 name = "fr-rust"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2024"
 authors = ["Sayed Anower <sayed.anower.17.2@gmail.com>"]
 description = "A comprehensive framework/utility library for Actix-web, Postgres, Redis, and authentication."
@@ -48,3 +48,12 @@ jsonwebtoken = "10.0"
 
 # Email Handling
 lettre = { version = "0.11", features = ["tokio1", "pool", "tokio1-native-tls"] }
+
+# High performance
+bytes = "1.5" # Zero-copy byte buffers
+memmap2 = "0.9" # Memory-mapped files (zero-copy I/O)
+
+# Compression (optional but recommended)
+brotli = "3.4" # Best compression ratio
+lz4-flex = "0.11" # Fastest compression/decompression
+secrecy = "0.10"

@@ -9,6 +9,6 @@ pub type RltRsp = Result<HttpResponse, Error>;
 
 pub type Rqs = HttpRequest;
 
-pub type MainRlt = std::io::Result<()>;
+pub type Main = std::io::Result<()>;
 
 pub type FileRlt = Result<NamedFile, Error>;
