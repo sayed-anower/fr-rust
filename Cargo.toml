@@ -55,5 +55,5 @@ memmap2 = "0.9" # Memory-mapped files (zero-copy I/O)
 
 # Compression (optional but recommended)
 brotli = "3.4" # Best compression ratio
-lz4-flex = "0.11" # Fastest compression/decompression
+lz4_flex = "=0.13.1" # Fastest compression/decompression
 secrecy = "0.10"
