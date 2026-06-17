@@ -1,4 +1,4 @@
-use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey, dangerous_insecure};
+use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey, decode_insecure};
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -334,7 +334,7 @@ impl Jwt {
     pub fn peek_user_id(token: &str) -> Option<String> {
         // SEC WARNING: This skips signature validation. Use ONLY for early routing 
         // (like extracting a DB shard or checking cache), NEVER for authorization.
-        dangerous_insecure::<Claims>(token)
+        decode_insecure::<Claims>(token)
             .ok()
             .map(|data| data.claims.sub)
     }

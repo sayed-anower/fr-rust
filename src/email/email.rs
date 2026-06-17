@@ -4,7 +4,7 @@ use lettre::{
         authentication::Credentials,
         PoolConfig,
     },
-    AsyncSmtpTransport, Message, Tokio1Executor,
+    AsyncSmtpTransport, Message, Tokio1Executor, AsyncTransport
 };
 use secrecy::{ExposeSecret, SecretString};
 use std::sync::Arc;
@@ -90,7 +90,7 @@ impl EmailService {
 
         // Security Fix: Handle Implicit TLS (SMTPS) vs STARTTLS properly
         let builder = if config.smtp_port == 465 {
-            AsyncSmtpTransport::<Tokio1Executor>::smtps(&config.smtp_host)?
+            AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)?
         } else {
             AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)?
         };
