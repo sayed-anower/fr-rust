@@ -157,7 +157,7 @@ impl TokenBlacklist {
             store: Arc::new(DashMap::with_capacity(10000)),
             cleanup_interval: tokio::time::Duration::from_secs(cleanup_interval_seconds),
         };
-        
+
         let store = blacklist.store.clone();
         let interval = blacklist.cleanup_interval;
         tokio::spawn(async move {
@@ -168,7 +168,7 @@ impl TokenBlacklist {
                 store.retain(|_, &mut exp| exp > now);
             }
         });
-        
+
         blacklist
     }
 
@@ -221,7 +221,7 @@ pub struct JwtService {
 
 impl JwtService {
     // ===== Factory Methods =====
-    
+
     pub fn new_hs256(secret: impl AsRef<[u8]>) -> Self {
         let secret = secret.as_ref();
         let mut validation = Validation::new(Algorithm::HS256);
@@ -231,7 +231,7 @@ impl JwtService {
             "iat".to_string(),
             "jti".to_string(),
         ]);
-        
+
         Self {
             encoding_key: Arc::new(EncodingKey::from_secret(secret)),
             decoding_key: Arc::new(DecodingKey::from_secret(secret)),
@@ -251,7 +251,7 @@ impl JwtService {
             "iat".to_string(),
             "jti".to_string(),
         ]);
-        
+
         Ok(Self {
             encoding_key: Arc::new(EncodingKey::from_rsa_pem(private_key.as_ref())
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
@@ -273,7 +273,7 @@ impl JwtService {
             "iat".to_string(),
             "jti".to_string(),
         ]);
-        
+
         Ok(Self {
             encoding_key: Arc::new(EncodingKey::from_rsa_pem(private_key.as_ref())
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
@@ -295,7 +295,7 @@ impl JwtService {
             "iat".to_string(),
             "jti".to_string(),
         ]);
-        
+
         Ok(Self {
             encoding_key: Arc::new(EncodingKey::from_ec_pem(private_key.as_ref())
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
@@ -317,7 +317,7 @@ impl JwtService {
             "iat".to_string(),
             "jti".to_string(),
         ]);
-        
+
         Ok(Self {
             encoding_key: Arc::new(EncodingKey::from_ed_pem(private_key.as_ref())
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
@@ -332,7 +332,7 @@ impl JwtService {
     }
 
     // ===== Configuration =====
-    
+
     #[inline]
     pub fn with_blacklist(mut self, blacklist: TokenBlacklist) -> Self {
         self.blacklist = Some(blacklist);
@@ -372,20 +372,37 @@ impl JwtService {
     }
 
     // ===== Token Generation =====
-    
+
     #[inline]
     pub fn generate(&self, sub: impl Into<String>, token_type: TokenType) -> Result<String, JwtError> {
         let mut claims = Claims::new(sub);
         let duration = token_type.duration_seconds();
         claims.exp = Claims::now() + duration as usize;
-        
+
         if let Some(ref iss) = self.issuer {
             claims.iss = Some(iss.clone());
         }
         if let Some(ref aud) = self.audience {
             claims.aud = Some(aud.clone());
         }
-        
+
+        let header = Header::new(self.algorithm);
+        Ok(encode(&header, &claims, &self.encoding_key)?)
+    }
+
+    /// Generate a token with a custom expiration timestamp (in seconds since epoch)
+    #[inline]
+    pub fn generate_exp_token(&self, sub: impl Into<String>, exp: usize) -> Result<String, JwtError> {
+        let mut claims = Claims::new(sub);
+        claims.exp = exp;
+
+        if let Some(ref iss) = self.issuer {
+            claims.iss = Some(iss.clone());
+        }
+        if let Some(ref aud) = self.audience {
+            claims.aud = Some(aud.clone());
+        }
+
         let header = Header::new(self.algorithm);
         Ok(encode(&header, &claims, &self.encoding_key)?)
     }
@@ -396,7 +413,7 @@ impl JwtService {
         claims.exp = Claims::now() + duration as usize;
         claims.iat = Claims::now();
         claims.jti = Uuid::now_v7().to_string();
-        
+
         let header = Header::new(self.algorithm);
         Ok(encode(&header, &claims, &self.encoding_key)?)
     }
@@ -413,15 +430,15 @@ impl JwtService {
     pub fn generate_access_refresh_with_claims(&self, claims: Claims) -> Result<(String, String), JwtError> {
         let access_claims = claims.clone();
         let refresh_claims = claims;
-        
+
         let access = self.generate_with_claims(access_claims, TokenType::Access)?;
         let refresh = self.generate_with_claims(refresh_claims, TokenType::Refresh)?;
-        
+
         Ok((access, refresh))
     }
 
     // ===== Token Verification =====
-    
+
     #[inline]
     pub fn verify(&self, token: &str) -> Result<Claims, JwtError> {
         let token_data = decode::<Claims>(
@@ -429,15 +446,15 @@ impl JwtService {
             &self.decoding_key,
             &self.validation,
         )?;
-        
+
         let claims = token_data.claims;
-        
+
         if let Some(ref blacklist) = self.blacklist {
             if blacklist.is_revoked(&claims.jti) {
                 return Err(JwtError::TokenRevoked);
             }
         }
-        
+
         Ok(claims)
     }
 
@@ -452,26 +469,26 @@ impl JwtService {
             validate_exp: false,
             ..(*self.validation).clone()
         };
-        
+
         let token_data = decode::<Claims>(
             token,
             &self.decoding_key,
             &validation,
         )?;
-        
+
         Ok(token_data.claims)
     }
 
     // ===== Refresh & Revoke =====
-    
+
     #[inline]
     pub fn refresh_access(&self, refresh_token: &str) -> Result<String, JwtError> {
         let claims = self.verify(refresh_token)?;
-        
+
         if claims.is_expired() {
             return Err(JwtError::TokenExpired);
         }
-        
+
         let new_claims = Claims::new(claims.sub);
         self.generate_with_claims(new_claims, TokenType::Access)
     }
@@ -479,7 +496,7 @@ impl JwtService {
     #[inline]
     pub fn revoke_token(&self, token: &str) -> Result<(), JwtError> {
         let claims = self.verify(token)?;
-        
+
         if let Some(ref blacklist) = self.blacklist {
             blacklist.revoke(&claims.jti, claims.exp);
             Ok(())
@@ -507,7 +524,7 @@ impl JwtService {
     }
 
     // ===== Utilities =====
-    
+
     /// Extract claims without validation (for debugging only)
     #[inline]
     pub fn peek_claims(&self, token: &str) -> Option<Claims> {
@@ -516,9 +533,8 @@ impl JwtService {
         validation.validate_exp = false;
         validation.validate_nbf = false;
         validation.validate_aud = false;
-        validation.validate_iss = false;
-        validation.validate_sub = false;
-        validation.required_spec_claims = HashSet::new();
+        // Issuer and subject validation are skipped by not setting `iss` or `sub`.
+        // The `validate_iss` and `validate_sub` fields do not exist in jsonwebtoken 10.x.
 
         decode::<Claims>(token, &self.decoding_key, &validation)
             .ok()
