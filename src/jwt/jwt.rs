@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use dashmap::DashMap;
 use uuid::Uuid;
-use chrono::{Duration};
+use chrono::Duration;
 
 // ============ Error Types ============
 #[derive(Debug, Error, Clone)]
@@ -66,7 +66,7 @@ impl Claims {
             sub: sub.into(),
             exp: now + 900,
             iat: now,
-            jti: Uuid::now_v7().to_string(), // ✅ v7 is faster than v4
+            jti: Uuid::now_v7().to_string(),
             iss: None,
             aud: None,
             nbf: None,
@@ -154,11 +154,10 @@ pub struct TokenBlacklist {
 impl TokenBlacklist {
     pub fn new(cleanup_interval_seconds: u64) -> Self {
         let blacklist = Self {
-            store: Arc::new(DashMap::with_capacity(10000)), // Pre-allocate for performance
+            store: Arc::new(DashMap::with_capacity(10000)),
             cleanup_interval: tokio::time::Duration::from_secs(cleanup_interval_seconds),
         };
         
-        // Spawn background cleanup
         let store = blacklist.store.clone();
         let interval = blacklist.cleanup_interval;
         tokio::spawn(async move {
@@ -166,7 +165,6 @@ impl TokenBlacklist {
             loop {
                 interval.tick().await;
                 let now = Claims::now();
-                // ✅ DashMap v6+ has retain
                 store.retain(|_, &mut exp| exp > now);
             }
         });
@@ -181,12 +179,11 @@ impl TokenBlacklist {
 
     #[inline]
     pub fn is_revoked(&self, jti: &str) -> bool {
-        if let Some(mut entry) = self.store.get_mut(jti) {
+        if let Some(entry) = self.store.get_mut(jti) {
             let exp = *entry;
             if exp > Claims::now() {
                 return true;
             }
-            // Expired - remove it
             drop(entry);
             self.store.remove(jti);
         }
@@ -227,9 +224,8 @@ impl JwtService {
     
     pub fn new_hs256(secret: impl AsRef<[u8]>) -> Self {
         let secret = secret.as_ref();
-        let mut validation = Validation::new(Algorithm::Hs256); // ✅ Updated name
+        let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = true;
-        validation.validate_iat = true; // ✅ Added in 10.x
         validation.required_spec_claims = HashSet::from([
             "exp".to_string(),
             "iat".to_string(),
@@ -239,7 +235,7 @@ impl JwtService {
         Self {
             encoding_key: Arc::new(EncodingKey::from_secret(secret)),
             decoding_key: Arc::new(DecodingKey::from_secret(secret)),
-            algorithm: Algorithm::Hs256,
+            algorithm: Algorithm::HS256,
             validation: Arc::new(validation),
             blacklist: None,
             issuer: None,
@@ -248,9 +244,8 @@ impl JwtService {
     }
 
     pub fn new_rs256(private_key: impl AsRef<[u8]>, public_key: impl AsRef<[u8]>) -> Result<Self, JwtError> {
-        let mut validation = Validation::new(Algorithm::Rs256);
+        let mut validation = Validation::new(Algorithm::RS256);
         validation.validate_exp = true;
-        validation.validate_iat = true;
         validation.required_spec_claims = HashSet::from([
             "exp".to_string(),
             "iat".to_string(),
@@ -262,7 +257,7 @@ impl JwtService {
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
             decoding_key: Arc::new(DecodingKey::from_rsa_pem(public_key.as_ref())
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
-            algorithm: Algorithm::Rs256,
+            algorithm: Algorithm::RS256,
             validation: Arc::new(validation),
             blacklist: None,
             issuer: None,
@@ -271,9 +266,8 @@ impl JwtService {
     }
 
     pub fn new_rs384(private_key: impl AsRef<[u8]>, public_key: impl AsRef<[u8]>) -> Result<Self, JwtError> {
-        let mut validation = Validation::new(Algorithm::Rs384);
+        let mut validation = Validation::new(Algorithm::RS384);
         validation.validate_exp = true;
-        validation.validate_iat = true;
         validation.required_spec_claims = HashSet::from([
             "exp".to_string(),
             "iat".to_string(),
@@ -285,7 +279,7 @@ impl JwtService {
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
             decoding_key: Arc::new(DecodingKey::from_rsa_pem(public_key.as_ref())
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
-            algorithm: Algorithm::Rs384,
+            algorithm: Algorithm::RS384,
             validation: Arc::new(validation),
             blacklist: None,
             issuer: None,
@@ -294,9 +288,8 @@ impl JwtService {
     }
 
     pub fn new_ecdsa_p256(private_key: impl AsRef<[u8]>, public_key: impl AsRef<[u8]>) -> Result<Self, JwtError> {
-        let mut validation = Validation::new(Algorithm::Es256);
+        let mut validation = Validation::new(Algorithm::ES256);
         validation.validate_exp = true;
-        validation.validate_iat = true;
         validation.required_spec_claims = HashSet::from([
             "exp".to_string(),
             "iat".to_string(),
@@ -308,7 +301,7 @@ impl JwtService {
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
             decoding_key: Arc::new(DecodingKey::from_ec_pem(public_key.as_ref())
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
-            algorithm: Algorithm::Es256,
+            algorithm: Algorithm::ES256,
             validation: Arc::new(validation),
             blacklist: None,
             issuer: None,
@@ -316,11 +309,9 @@ impl JwtService {
         })
     }
 
-    // ✅ NEW: Ed25519 support (new in 10.x)
     pub fn new_ed25519(private_key: impl AsRef<[u8]>, public_key: impl AsRef<[u8]>) -> Result<Self, JwtError> {
-        let mut validation = Validation::new(Algorithm::EdDsa);
+        let mut validation = Validation::new(Algorithm::EdDSA);
         validation.validate_exp = true;
-        validation.validate_iat = true;
         validation.required_spec_claims = HashSet::from([
             "exp".to_string(),
             "iat".to_string(),
@@ -332,36 +323,12 @@ impl JwtService {
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
             decoding_key: Arc::new(DecodingKey::from_ed_pem(public_key.as_ref())
                 .map_err(|e| JwtError::KeyError(e.to_string()))?),
-            algorithm: Algorithm::EdDsa,
+            algorithm: Algorithm::EdDSA,
             validation: Arc::new(validation),
             blacklist: None,
             issuer: None,
             audience: None,
         })
-    }
-
-    // ✅ NEW: Support for AWS LC (FIPS-compliant)
-    #[cfg(feature = "aws_lc_rs")]
-    pub fn new_hs256_aws(secret: impl AsRef<[u8]>) -> Self {
-        let secret = secret.as_ref();
-        let mut validation = Validation::new(Algorithm::Hs256);
-        validation.validate_exp = true;
-        validation.validate_iat = true;
-        validation.required_spec_claims = HashSet::from([
-            "exp".to_string(),
-            "iat".to_string(),
-            "jti".to_string(),
-        ]);
-        
-        Self {
-            encoding_key: Arc::new(EncodingKey::from_secret(secret)),
-            decoding_key: Arc::new(DecodingKey::from_secret(secret)),
-            algorithm: Algorithm::Hs256,
-            validation: Arc::new(validation),
-            blacklist: None,
-            issuer: None,
-            audience: None,
-        }
     }
 
     // ===== Configuration =====
@@ -505,7 +472,6 @@ impl JwtService {
             return Err(JwtError::TokenExpired);
         }
         
-        // Check if it's actually a refresh token (optional)
         let new_claims = Claims::new(claims.sub);
         self.generate_with_claims(new_claims, TokenType::Access)
     }
@@ -544,37 +510,44 @@ impl JwtService {
     
     /// Extract claims without validation (for debugging only)
     #[inline]
-    pub fn peek_claims(token: &str) -> Option<Claims> {
-        // ✅ In jsonwebtoken 10.x, insecure is still available
-        use jsonwebtoken::insecure::decode_insecure;
-        decode_insecure::<Claims>(token)
+    pub fn peek_claims(&self, token: &str) -> Option<Claims> {
+        // Disable all validation checks
+        let mut validation = Validation::default();
+        validation.validate_exp = false;
+        validation.validate_nbf = false;
+        validation.validate_aud = false;
+        validation.validate_iss = false;
+        validation.validate_sub = false;
+        validation.required_spec_claims = HashSet::new();
+
+        decode::<Claims>(token, &self.decoding_key, &validation)
             .ok()
             .map(|data| data.claims)
     }
 
     #[inline]
-    pub fn extract_subject(token: &str) -> Option<String> {
-        Self::peek_claims(token).map(|c| c.sub)
+    pub fn extract_subject(&self, token: &str) -> Option<String> {
+        self.peek_claims(token).map(|c| c.sub)
     }
 
     #[inline]
-    pub fn get_token_expiry(token: &str) -> Option<usize> {
-        Self::peek_claims(token).map(|c| c.exp)
+    pub fn get_token_expiry(&self, token: &str) -> Option<usize> {
+        self.peek_claims(token).map(|c| c.exp)
     }
 
     #[inline]
-    pub fn get_token_jti(token: &str) -> Option<String> {
-        Self::peek_claims(token).map(|c| c.jti)
+    pub fn get_token_jti(&self, token: &str) -> Option<String> {
+        self.peek_claims(token).map(|c| c.jti)
     }
 
     #[inline]
-    pub fn get_token_issuer(token: &str) -> Option<String> {
-        Self::peek_claims(token).and_then(|c| c.iss)
+    pub fn get_token_issuer(&self, token: &str) -> Option<String> {
+        self.peek_claims(token).and_then(|c| c.iss)
     }
 
     #[inline]
-    pub fn get_token_audience(token: &str) -> Option<String> {
-        Self::peek_claims(token).and_then(|c| c.aud)
+    pub fn get_token_audience(&self, token: &str) -> Option<String> {
+        self.peek_claims(token).and_then(|c| c.aud)
     }
 }
 

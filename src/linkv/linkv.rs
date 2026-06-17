@@ -20,7 +20,7 @@ pub struct LinkVConfig {
     pub secret: String,
     pub crypto: CryptoService,
     pub redis: RedisManager,
-    pub jwt: Jwt,
+    pub jwt: JwtService,
 }
 
 #[derive(Clone)]
