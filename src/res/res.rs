@@ -10,7 +10,7 @@ use bytes::Bytes;
 use brotli::CompressorWriter;
 use tokio_util::io::ReaderStream;
 // Use public prepended API instead of private frame modules
-use lz4_flex::{compress_prepended, decompress_size_prepended};
+use lz4_flex::{compress_prepend_size};
 
 // ============== HIGH-PERFORMANCE RESPONSES ==============
 
@@ -223,7 +223,7 @@ pub fn http_brotli(data: &[u8], quality: u32) -> HttpResponse {
 /// LZ4 compressed response (fastest decompression)
 pub fn http_lz4(data: &[u8]) -> HttpResponse {
     // Fixed: Uses public prepended API
-    let compressed = compress_prepended(data);
+    let compressed = compress_prepend_size(data);
     
     HttpResponse::Ok()
         .insert_header((header::CONTENT_ENCODING, "lz4"))
@@ -264,7 +264,7 @@ pub fn parse_json_fast<T: serde::de::DeserializeOwned>(data: &Bytes) -> Result<T
 // ============== UTILITIES ==============
 
 #[inline]
-fn parse_range(range_str: &str, file_size: u64) -> Option<(u64, u64)> {
+pub fn parse_range(range_str: &str, file_size: u64) -> Option<(u64, u64)> {
     let range_str = range_str.trim_start_matches("bytes=");
     let parts: Vec<&str> = range_str.split('-').collect();
     

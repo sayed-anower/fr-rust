@@ -1,4 +1,5 @@
-use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey, dangerous_insecure_decode};
+use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
+use jsonwebtoken::dangerous::dangerous_insecure_decode;
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -302,9 +303,8 @@ impl Jwt {
         Ok(claims)
     }
 
-    // COMPILER FIX: Added to support src/linkv/linkv.rs line 57
-    pub fn verify_token(&self, token: &str) -> Result<Claims, JwtError> {
-        self.verify(token)
+    pub fn verify_token(&self, token: &str) -> bool {
+        self.verify(token).is_ok()
     }
     
     pub fn refresh_access(&self, refresh_token: &str) -> Result<String, JwtError> {

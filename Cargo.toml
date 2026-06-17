@@ -48,7 +48,7 @@ rand = "0.10.1"
 jsonwebtoken = "10.0"
 
 # Email Handling
-lettre = { version = "0.11", features = ["tokio1", "pool", "tokio1-native-tls"] }
+lettre = { version = "0.11", features = ["tokio1", "pool", "tokio1-native-tls", "tokio1-rustls"] }
 
 # High performance
 bytes = "1.5" # Zero-copy byte buffers

@@ -1,3 +1,4 @@
+use std::time::Instant;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     error::{ErrorForbidden, ErrorTooManyRequests},
@@ -40,7 +41,7 @@ impl IpStats {
     }
 
     fn ban(&mut self, ban_duration: Duration) {
-        self.banned_until = Some(now() + ban_duration);
+        self.banned_until = Some(Instantnow() + ban_duration);
     }
 
     fn clear_ban(&mut self) {
