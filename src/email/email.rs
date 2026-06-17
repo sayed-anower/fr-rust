@@ -105,7 +105,7 @@ impl EmailService {
                     // Removed invalid max_idle(10) method
                     .idle_timeout(Duration::from_secs(300)),
             )
-            .timeout(Duration::from_secs(config.timeout_secs))
+            .timeout(Some(Duration::from_secs(config.timeout_secs)))
             .build();
 
         let from_mailbox = Mailbox::new(
