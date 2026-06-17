@@ -21,7 +21,7 @@ pub mod prelude {
     pub use crate::db::{self, DbPool};
     pub use crate::ddos::{self, DdosConfig, DdosShield};
     pub use crate::email::{self, EmailConfig, EmailData, EmailService};
-    pub use crate::jwt::{self, Jwt};
+    pub use crate::jwt::{self, JwtService};
     pub use crate::linkv::{self, LinkV, LinkVConfig};
     pub use crate::otp::{self, OtpConfig, OtpService};
     pub use crate::redis::{self, RedisManager, RedisManagerError};

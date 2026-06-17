@@ -25,7 +25,7 @@ hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 async-trait = "0.1"
-uuid = { version = "1.23", features = ["v4", "serde"] }
+uuid = { version = "1.23", features = ["v7", "serde"] }
 
 # Actix Web Ecosystem (Aligned for compatibility)
 actix-web = "4.9"
@@ -46,6 +46,9 @@ hmac = "0.12"
 sha2 = "0.10"
 rand = "0.10.1"
 
+# Json
+jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
+
 # Email Handling
 lettre = { version = "0.11", default-features = false, features = [
     "tokio1", 
@@ -61,7 +64,7 @@ lettre = { version = "0.11", default-features = false, features = [
 bytes = "1.5" # Zero-copy byte buffers
 memmap2 = "0.9" # Memory-mapped files (zero-copy I/O)
 
-# Compression (optional but recommended)
+# Compression
 brotli = "3.4" # Best compression ratio
 lz4_flex = "=0.13.1" # Fastest compression/decompression
 secrecy = "0.10"

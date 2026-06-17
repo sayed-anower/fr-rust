@@ -1,2 +1,2 @@
 pub mod jwt;
-pub use jwt::Jwt;
+pub use jwt::JwtService;
