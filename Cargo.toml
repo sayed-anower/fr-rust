@@ -48,7 +48,14 @@ rand = "0.10.1"
 jsonwebtoken = "10.0"
 
 # Email Handling
-lettre = { version = "0.11", features = ["tokio1", "pool", "tokio1-rustls"] }
+lettre = { version = "0.11", default-features = false, features = [
+    "tokio1", 
+    "pool", 
+    "tokio1-rustls", 
+    "ring",
+    "webpki-roots"
+] }
+
 
 # High performance
 bytes = "1.5" # Zero-copy byte buffers
