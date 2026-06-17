@@ -465,10 +465,19 @@ impl JwtService {
 
     #[inline]
     pub fn verify_without_expiry(&self, token: &str) -> Result<Claims, JwtError> {
-        let validation = Validation {
-            validate_exp: false,
-            ..(*self.validation).clone()
-        };
+        // Create a new Validation with the same algorithm and settings, but with validate_exp = false
+        let mut validation = Validation::new(self.algorithm);
+        validation.validate_exp = false;
+        // Copy other public settings from the stored validation
+        validation.leeway = self.validation.leeway;
+        validation.required_spec_claims = self.validation.required_spec_claims.clone();
+        // Copy issuer and audience if set
+        if let Some(ref iss) = self.issuer {
+            validation.set_issuer(&[iss.clone()]);
+        }
+        if let Some(ref aud) = self.audience {
+            validation.set_audience(&[aud.clone()]);
+        }
 
         let token_data = decode::<Claims>(
             token,
@@ -528,13 +537,12 @@ impl JwtService {
     /// Extract claims without validation (for debugging only)
     #[inline]
     pub fn peek_claims(&self, token: &str) -> Option<Claims> {
-        // Disable all validation checks
+        // Create a minimal Validation with no checks
         let mut validation = Validation::default();
         validation.validate_exp = false;
         validation.validate_nbf = false;
         validation.validate_aud = false;
         // Issuer and subject validation are skipped by not setting `iss` or `sub`.
-        // The `validate_iss` and `validate_sub` fields do not exist in jsonwebtoken 10.x.
 
         decode::<Claims>(token, &self.decoding_key, &validation)
             .ok()
