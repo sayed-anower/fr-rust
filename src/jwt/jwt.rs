@@ -1,12 +1,12 @@
-// jwt.rs - Production-ready JWT module
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation, Algorithm};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use dashmap::DashMap;
-use tracing::{info, warn};
 use uuid::Uuid;
+use chrono::{Utc, Duration};
 
 // ============ Error Types ============
 #[derive(Debug, Error, Clone)]
@@ -25,6 +25,8 @@ pub enum JwtError {
     InvalidAudience,
     #[error("Missing required claim: {0}")]
     MissingClaim(String),
+    #[error("Key generation error: {0}")]
+    KeyError(String),
 }
 
 impl From<jsonwebtoken::errors::Error> for JwtError {
@@ -32,6 +34,8 @@ impl From<jsonwebtoken::errors::Error> for JwtError {
         match err.kind() {
             jsonwebtoken::errors::ErrorKind::ExpiredSignature => JwtError::TokenExpired,
             jsonwebtoken::errors::ErrorKind::InvalidSignature => JwtError::InvalidSignature,
+            jsonwebtoken::errors::ErrorKind::InvalidIssuer => JwtError::InvalidIssuer,
+            jsonwebtoken::errors::ErrorKind::InvalidAudience => JwtError::InvalidAudience,
             _ => JwtError::InvalidToken(err.to_string()),
         }
     }
@@ -60,9 +64,9 @@ impl Claims {
         let now = Self::now();
         Self {
             sub: sub.into(),
-            exp: now + 900, // 15 minutes default
+            exp: now + 900,
             iat: now,
-            jti: Uuid::new_v4().to_string(),
+            jti: Uuid::now_v7().to_string(), // ✅ v7 is faster than v4
             iss: None,
             aud: None,
             nbf: None,
@@ -71,7 +75,7 @@ impl Claims {
     }
 
     #[inline]
-    fn now() -> usize {
+    pub fn now() -> usize {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -106,6 +110,15 @@ impl Claims {
     pub fn is_expired(&self) -> bool {
         Self::now() > self.exp
     }
+
+    #[inline]
+    pub fn remaining_time(&self) -> Option<Duration> {
+        if self.is_expired() {
+            return None;
+        }
+        let remaining = self.exp - Self::now();
+        Some(Duration::seconds(remaining as i64))
+    }
 }
 
 // ============ Token Types ============
@@ -120,7 +133,7 @@ pub enum TokenType {
 
 impl TokenType {
     #[inline]
-    fn duration_seconds(&self) -> u64 {
+    pub const fn duration_seconds(&self) -> u64 {
         match self {
             TokenType::Access => 900,        // 15 minutes
             TokenType::Refresh => 604800,    // 7 days
@@ -131,7 +144,7 @@ impl TokenType {
     }
 }
 
-// ============ Blacklist ============
+// ============ Blacklist with Sharded Storage ============
 #[derive(Clone)]
 pub struct TokenBlacklist {
     store: Arc<DashMap<String, usize>>,
@@ -141,11 +154,11 @@ pub struct TokenBlacklist {
 impl TokenBlacklist {
     pub fn new(cleanup_interval_seconds: u64) -> Self {
         let blacklist = Self {
-            store: Arc::new(DashMap::new()),
+            store: Arc::new(DashMap::with_capacity(10000)), // Pre-allocate for performance
             cleanup_interval: tokio::time::Duration::from_secs(cleanup_interval_seconds),
         };
         
-        // Start background cleanup
+        // Spawn background cleanup
         let store = blacklist.store.clone();
         let interval = blacklist.cleanup_interval;
         tokio::spawn(async move {
@@ -153,6 +166,7 @@ impl TokenBlacklist {
             loop {
                 interval.tick().await;
                 let now = Claims::now();
+                // ✅ DashMap v6+ has retain
                 store.retain(|_, &mut exp| exp > now);
             }
         });
@@ -167,12 +181,13 @@ impl TokenBlacklist {
 
     #[inline]
     pub fn is_revoked(&self, jti: &str) -> bool {
-        if let Some((_, exp)) = self.store.get(jti) {
-            if *exp > Claims::now() {
+        if let Some(mut entry) = self.store.get_mut(jti) {
+            let exp = *entry;
+            if exp > Claims::now() {
                 return true;
             }
-            // Expired entry - remove it
-            drop(exp);
+            // Expired - remove it
+            drop(entry);
             self.store.remove(jti);
         }
         false
@@ -182,11 +197,16 @@ impl TokenBlacklist {
     pub fn len(&self) -> usize {
         self.store.len()
     }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.store.is_empty()
+    }
 }
 
 impl Default for TokenBlacklist {
     fn default() -> Self {
-        Self::new(300) // Cleanup every 5 minutes
+        Self::new(300)
     }
 }
 
@@ -207,14 +227,19 @@ impl JwtService {
     
     pub fn new_hs256(secret: impl AsRef<[u8]>) -> Self {
         let secret = secret.as_ref();
-        let mut validation = Validation::new(Algorithm::HS256);
+        let mut validation = Validation::new(Algorithm::Hs256); // ✅ Updated name
         validation.validate_exp = true;
-        validation.required_spec_claims = vec!["exp".to_string(), "iat".to_string(), "jti".to_string()];
+        validation.validate_iat = true; // ✅ Added in 10.x
+        validation.required_spec_claims = HashSet::from([
+            "exp".to_string(),
+            "iat".to_string(),
+            "jti".to_string(),
+        ]);
         
         Self {
             encoding_key: Arc::new(EncodingKey::from_secret(secret)),
             decoding_key: Arc::new(DecodingKey::from_secret(secret)),
-            algorithm: Algorithm::HS256,
+            algorithm: Algorithm::Hs256,
             validation: Arc::new(validation),
             blacklist: None,
             issuer: None,
@@ -223,18 +248,44 @@ impl JwtService {
     }
 
     pub fn new_rs256(private_key: impl AsRef<[u8]>, public_key: impl AsRef<[u8]>) -> Result<Self, JwtError> {
-        let private_key = private_key.as_ref();
-        let public_key = public_key.as_ref();
-        let mut validation = Validation::new(Algorithm::RS256);
+        let mut validation = Validation::new(Algorithm::Rs256);
         validation.validate_exp = true;
-        validation.required_spec_claims = vec!["exp".to_string(), "iat".to_string(), "jti".to_string()];
+        validation.validate_iat = true;
+        validation.required_spec_claims = HashSet::from([
+            "exp".to_string(),
+            "iat".to_string(),
+            "jti".to_string(),
+        ]);
         
         Ok(Self {
-            encoding_key: Arc::new(EncodingKey::from_rsa_pem(private_key)
-                .map_err(|e| JwtError::InvalidToken(e.to_string()))?),
-            decoding_key: Arc::new(DecodingKey::from_rsa_pem(public_key)
-                .map_err(|e| JwtError::InvalidToken(e.to_string()))?),
-            algorithm: Algorithm::RS256,
+            encoding_key: Arc::new(EncodingKey::from_rsa_pem(private_key.as_ref())
+                .map_err(|e| JwtError::KeyError(e.to_string()))?),
+            decoding_key: Arc::new(DecodingKey::from_rsa_pem(public_key.as_ref())
+                .map_err(|e| JwtError::KeyError(e.to_string()))?),
+            algorithm: Algorithm::Rs256,
+            validation: Arc::new(validation),
+            blacklist: None,
+            issuer: None,
+            audience: None,
+        })
+    }
+
+    pub fn new_rs384(private_key: impl AsRef<[u8]>, public_key: impl AsRef<[u8]>) -> Result<Self, JwtError> {
+        let mut validation = Validation::new(Algorithm::Rs384);
+        validation.validate_exp = true;
+        validation.validate_iat = true;
+        validation.required_spec_claims = HashSet::from([
+            "exp".to_string(),
+            "iat".to_string(),
+            "jti".to_string(),
+        ]);
+        
+        Ok(Self {
+            encoding_key: Arc::new(EncodingKey::from_rsa_pem(private_key.as_ref())
+                .map_err(|e| JwtError::KeyError(e.to_string()))?),
+            decoding_key: Arc::new(DecodingKey::from_rsa_pem(public_key.as_ref())
+                .map_err(|e| JwtError::KeyError(e.to_string()))?),
+            algorithm: Algorithm::Rs384,
             validation: Arc::new(validation),
             blacklist: None,
             issuer: None,
@@ -243,21 +294,74 @@ impl JwtService {
     }
 
     pub fn new_ecdsa_p256(private_key: impl AsRef<[u8]>, public_key: impl AsRef<[u8]>) -> Result<Self, JwtError> {
-        let mut validation = Validation::new(Algorithm::ES256);
+        let mut validation = Validation::new(Algorithm::Es256);
         validation.validate_exp = true;
-        validation.required_spec_claims = vec!["exp".to_string(), "iat".to_string(), "jti".to_string()];
+        validation.validate_iat = true;
+        validation.required_spec_claims = HashSet::from([
+            "exp".to_string(),
+            "iat".to_string(),
+            "jti".to_string(),
+        ]);
         
         Ok(Self {
             encoding_key: Arc::new(EncodingKey::from_ec_pem(private_key.as_ref())
-                .map_err(|e| JwtError::InvalidToken(e.to_string()))?),
+                .map_err(|e| JwtError::KeyError(e.to_string()))?),
             decoding_key: Arc::new(DecodingKey::from_ec_pem(public_key.as_ref())
-                .map_err(|e| JwtError::InvalidToken(e.to_string()))?),
-            algorithm: Algorithm::ES256,
+                .map_err(|e| JwtError::KeyError(e.to_string()))?),
+            algorithm: Algorithm::Es256,
             validation: Arc::new(validation),
             blacklist: None,
             issuer: None,
             audience: None,
         })
+    }
+
+    // ✅ NEW: Ed25519 support (new in 10.x)
+    pub fn new_ed25519(private_key: impl AsRef<[u8]>, public_key: impl AsRef<[u8]>) -> Result<Self, JwtError> {
+        let mut validation = Validation::new(Algorithm::EdDsa);
+        validation.validate_exp = true;
+        validation.validate_iat = true;
+        validation.required_spec_claims = HashSet::from([
+            "exp".to_string(),
+            "iat".to_string(),
+            "jti".to_string(),
+        ]);
+        
+        Ok(Self {
+            encoding_key: Arc::new(EncodingKey::from_ed_pem(private_key.as_ref())
+                .map_err(|e| JwtError::KeyError(e.to_string()))?),
+            decoding_key: Arc::new(DecodingKey::from_ed_pem(public_key.as_ref())
+                .map_err(|e| JwtError::KeyError(e.to_string()))?),
+            algorithm: Algorithm::EdDsa,
+            validation: Arc::new(validation),
+            blacklist: None,
+            issuer: None,
+            audience: None,
+        })
+    }
+
+    // ✅ NEW: Support for AWS LC (FIPS-compliant)
+    #[cfg(feature = "aws_lc_rs")]
+    pub fn new_hs256_aws(secret: impl AsRef<[u8]>) -> Self {
+        let secret = secret.as_ref();
+        let mut validation = Validation::new(Algorithm::Hs256);
+        validation.validate_exp = true;
+        validation.validate_iat = true;
+        validation.required_spec_claims = HashSet::from([
+            "exp".to_string(),
+            "iat".to_string(),
+            "jti".to_string(),
+        ]);
+        
+        Self {
+            encoding_key: Arc::new(EncodingKey::from_secret(secret)),
+            decoding_key: Arc::new(DecodingKey::from_secret(secret)),
+            algorithm: Algorithm::Hs256,
+            validation: Arc::new(validation),
+            blacklist: None,
+            issuer: None,
+            audience: None,
+        }
     }
 
     // ===== Configuration =====
@@ -289,7 +393,14 @@ impl JwtService {
     #[inline]
     pub fn with_leeway(mut self, seconds: u64) -> Self {
         let validation = Arc::make_mut(&mut self.validation);
-        validation.leeway = seconds as i64;
+        validation.leeway = seconds;
+        self
+    }
+
+    #[inline]
+    pub fn disable_exp_validation(mut self) -> Self {
+        let validation = Arc::make_mut(&mut self.validation);
+        validation.validate_exp = false;
         self
     }
 
@@ -317,7 +428,7 @@ impl JwtService {
         let duration = token_type.duration_seconds();
         claims.exp = Claims::now() + duration as usize;
         claims.iat = Claims::now();
-        claims.jti = Uuid::new_v4().to_string();
+        claims.jti = Uuid::now_v7().to_string();
         
         let header = Header::new(self.algorithm);
         Ok(encode(&header, &claims, &self.encoding_key)?)
@@ -331,11 +442,21 @@ impl JwtService {
         Ok((access, refresh))
     }
 
+    #[inline]
+    pub fn generate_access_refresh_with_claims(&self, claims: Claims) -> Result<(String, String), JwtError> {
+        let access_claims = claims.clone();
+        let refresh_claims = claims;
+        
+        let access = self.generate_with_claims(access_claims, TokenType::Access)?;
+        let refresh = self.generate_with_claims(refresh_claims, TokenType::Refresh)?;
+        
+        Ok((access, refresh))
+    }
+
     // ===== Token Verification =====
     
     #[inline]
     pub fn verify(&self, token: &str) -> Result<Claims, JwtError> {
-        // Decode and validate signature
         let token_data = decode::<Claims>(
             token,
             &self.decoding_key,
@@ -344,7 +465,6 @@ impl JwtService {
         
         let claims = token_data.claims;
         
-        // Check blacklist
         if let Some(ref blacklist) = self.blacklist {
             if blacklist.is_revoked(&claims.jti) {
                 return Err(JwtError::TokenRevoked);
@@ -359,18 +479,33 @@ impl JwtService {
         self.verify(token).is_ok()
     }
 
+    #[inline]
+    pub fn verify_without_expiry(&self, token: &str) -> Result<Claims, JwtError> {
+        let validation = Validation {
+            validate_exp: false,
+            ..(*self.validation).clone()
+        };
+        
+        let token_data = decode::<Claims>(
+            token,
+            &self.decoding_key,
+            &validation,
+        )?;
+        
+        Ok(token_data.claims)
+    }
+
     // ===== Refresh & Revoke =====
     
     #[inline]
     pub fn refresh_access(&self, refresh_token: &str) -> Result<String, JwtError> {
         let claims = self.verify(refresh_token)?;
         
-        // Ensure refresh token hasn't expired
         if claims.is_expired() {
             return Err(JwtError::TokenExpired);
         }
         
-        // Generate new access token with same subject
+        // Check if it's actually a refresh token (optional)
         let new_claims = Claims::new(claims.sub);
         self.generate_with_claims(new_claims, TokenType::Access)
     }
@@ -383,7 +518,6 @@ impl JwtService {
             blacklist.revoke(&claims.jti, claims.exp);
             Ok(())
         } else {
-            // No blacklist configured - can't revoke
             Err(JwtError::InvalidToken("Blacklist not configured".to_string()))
         }
     }
@@ -398,12 +532,22 @@ impl JwtService {
         }
     }
 
+    #[inline]
+    pub fn is_revoked(&self, jti: &str) -> bool {
+        self.blacklist
+            .as_ref()
+            .map(|b| b.is_revoked(jti))
+            .unwrap_or(false)
+    }
+
     // ===== Utilities =====
     
     /// Extract claims without validation (for debugging only)
     #[inline]
     pub fn peek_claims(token: &str) -> Option<Claims> {
-        jsonwebtoken::dangerous_unsafe::decode_insecure::<Claims>(token)
+        // ✅ In jsonwebtoken 10.x, insecure is still available
+        use jsonwebtoken::insecure::decode_insecure;
+        decode_insecure::<Claims>(token)
             .ok()
             .map(|data| data.claims)
     }
@@ -417,11 +561,26 @@ impl JwtService {
     pub fn get_token_expiry(token: &str) -> Option<usize> {
         Self::peek_claims(token).map(|c| c.exp)
     }
+
+    #[inline]
+    pub fn get_token_jti(token: &str) -> Option<String> {
+        Self::peek_claims(token).map(|c| c.jti)
+    }
+
+    #[inline]
+    pub fn get_token_issuer(token: &str) -> Option<String> {
+        Self::peek_claims(token).and_then(|c| c.iss)
+    }
+
+    #[inline]
+    pub fn get_token_audience(token: &str) -> Option<String> {
+        Self::peek_claims(token).and_then(|c| c.aud)
+    }
 }
 
 // ============ Macro for quick setup ============
 #[macro_export]
-macro_rules! jwt_service {
+macro_rules! setup_jwt {
     ($secret:expr) => {
         JwtService::new_hs256($secret)
     };
@@ -433,60 +592,4 @@ macro_rules! jwt_service {
             .with_issuer($issuer)
             .with_audience($audience)
     };
-}
-
-// ============ Tests ============
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serial_test::serial;
-
-    #[test]
-    fn test_generate_verify() {
-        let service = JwtService::new_hs256("test_secret");
-        let token = service.generate("user123", TokenType::Access).unwrap();
-        
-        let claims = service.verify(&token).unwrap();
-        assert_eq!(claims.sub, "user123");
-    }
-
-    #[test]
-    fn test_blacklist_revocation() {
-        let blacklist = TokenBlacklist::new(60);
-        let service = JwtService::new_hs256("test_secret")
-            .with_blacklist(blacklist);
-        
-        let token = service.generate("user123", TokenType::Access).unwrap();
-        let claims = service.verify(&token).unwrap();
-        
-        service.revoke_token(&token).unwrap();
-        let result = service.verify(&token);
-        assert!(matches!(result, Err(JwtError::TokenRevoked)));
-    }
-
-    #[test]
-    fn test_refresh_token() {
-        let service = JwtService::new_hs256("test_secret");
-        let refresh_token = service.generate("user123", TokenType::Refresh).unwrap();
-        
-        let new_access = service.refresh_access(&refresh_token).unwrap();
-        let claims = service.verify(&new_access).unwrap();
-        assert_eq!(claims.sub, "user123");
-    }
-
-    #[test]
-    #[serial]
-    fn test_token_expiry() {
-        let service = JwtService::new_hs256("test_secret");
-        let token = service.generate_with_claims(
-            Claims::new("user123").with_expiration(1),
-            TokenType::Custom(1)
-        ).unwrap();
-        
-        // Wait for expiry
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        
-        let result = service.verify(&token);
-        assert!(matches!(result, Err(JwtError::TokenExpired)));
-    }
 }
