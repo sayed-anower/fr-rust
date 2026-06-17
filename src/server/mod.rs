@@ -1,3 +1,3 @@
 pub mod server;
-pub use server::{env_var, env_var_or_default, load_env};
+pub use server::{env, env_or_default, load_env};
 pub mod run;

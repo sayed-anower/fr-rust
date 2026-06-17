@@ -45,17 +45,18 @@ aes-gcm = "0.10"
 hmac = "0.12"
 sha2 = "0.10"
 rand = "0.10.1"
-jsonwebtoken = "10.0"
+jsonwebtoken = { version = "10.0", features = ["danger-zone"] }
 
 # Email Handling
 lettre = { version = "0.11", default-features = false, features = [
     "tokio1", 
     "pool", 
     "tokio1-rustls", 
-    "ring",
-    "webpki-roots"
+    "ring",          
+    "webpki-roots",
+    "smtp-transport",
+    "builder"
 ] }
-
 
 # High performance
 bytes = "1.5" # Zero-copy byte buffers

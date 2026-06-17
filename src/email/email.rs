@@ -4,7 +4,7 @@ use lettre::{
         authentication::Credentials,
         PoolConfig,
     },
-    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+    AsyncSmtpTransport, Message, Tokio1Executor,
 };
 use secrecy::{ExposeSecret, SecretString};
 use std::sync::Arc;
