@@ -8,7 +8,7 @@ use argon2::{
 };
 use base64::{engine::general_purpose, Engine as _};
 use hex::ToHex;
-use rand::Rng;
+use rand::RngExt;
 use sha2::{Digest, Sha256};
 use std::io::{BufReader, Read};
 use thiserror::Error;
@@ -49,7 +49,7 @@ pub struct CryptoService {
 }
 
 impl CryptoService {
-    /// Creates a new service with the given 32‑byte encryption key.
+    // Creates a new service with the given 32‑byte encryption key.
     pub fn new(key: &[u8; 32]) -> Result<Self> {
         let cipher = Aes256Gcm::new_from_slice(key)
             .map_err(|_| CryptoError::InvalidKeyLength)?;
@@ -67,8 +67,8 @@ impl CryptoService {
         let hash = hasher.finalize();
         // Encode directly to hex without extra allocations.
         let mut hex = String::with_capacity(64);
-        hex.encode_hex(&hash); // uses the `hex` crate's `ToHex` impl
-        Ok(hex)
+        let hex_string: String = hash.encode_hex();
+        Ok(hex_string)
     }
 
     #[inline]
@@ -152,8 +152,8 @@ impl CryptoService {
             }
             let hash = hasher.finalize();
             let mut hex = String::with_capacity(64);
-            hex.encode_hex(&hash);
-            Ok(hex)
+            let hex_string: String = hash.encode_hex();
+            Ok(hex_string)
         })
         .await?
     }
@@ -193,14 +193,4 @@ impl CryptoService {
         tokio::fs::write(&new_path, decrypted.as_bytes()).await?;
         Ok(new_path)
     }
-}
-
-// ========== Macro ==========
-
-#[macro_export]
-macro_rules! crypto_service {
-    ($key:expr) => {{
-        // $key must be of type [u8; 32]
-        $crate::CryptoService::new(&$key).expect("Invalid key length")
-    }};
 }

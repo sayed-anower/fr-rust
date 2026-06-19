@@ -574,19 +574,3 @@ impl JwtService {
         self.peek_claims(token).and_then(|c| c.aud)
     }
 }
-
-// ============ Macro for quick setup ============
-#[macro_export]
-macro_rules! setup_jwt {
-    ($secret:expr) => {
-        JwtService::new_hs256($secret)
-    };
-    ($secret:expr, $issuer:expr) => {
-        JwtService::new_hs256($secret).with_issuer($issuer)
-    };
-    ($secret:expr, $issuer:expr, $audience:expr) => {
-        JwtService::new_hs256($secret)
-            .with_issuer($issuer)
-            .with_audience($audience)
-    };
-}
