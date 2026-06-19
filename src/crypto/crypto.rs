@@ -3,154 +3,204 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use argon2::{
-    password_hash::{
-        rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
-    },
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
 use base64::{engine::general_purpose, Engine as _};
+use hex::ToHex;
 use rand::Rng;
 use sha2::{Digest, Sha256};
+use std::io::{BufReader, Read};
 use thiserror::Error;
 use tokio::task;
 
-// --- ERROR HANDLING ---
+// ========== Error Handling ==========
 
 #[derive(Error, Debug)]
 pub enum CryptoError {
     #[error("Invalid encryption key length")]
     InvalidKeyLength,
-
     #[error("Encryption failed")]
     EncryptionFailed,
-
     #[error("Decryption failed")]
     DecryptionFailed,
-
     #[error("Invalid encrypted data: too short")]
     InvalidDataLength,
-
     #[error("Base64 decode error: {0}")]
     Base64(#[from] base64::DecodeError),
-
     #[error("Invalid UTF-8 sequence: {0}")]
     Utf8(#[from] std::string::FromUtf8Error),
-
-    #[error("Argon2 hashing error: {0}")]
+    #[error("Argon2 error: {0}")]
     Argon2(#[from] argon2::password_hash::Error),
-
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
     #[error("Async task join error: {0}")]
     Join(#[from] tokio::task::JoinError),
 }
 
 pub type Result<T> = std::result::Result<T, CryptoError>;
 
-// --- OOP SERVICE ---
+// ========== Core Service ==========
 
 #[derive(Clone)]
 pub struct CryptoService {
     cipher: Aes256Gcm,
+    argon2: Argon2<'static>, // cached Argon2 context
 }
 
 impl CryptoService {
-    /// Constructor: Initializes the AES cipher once.
-    pub fn new(encryption_key: &[u8; 32]) -> Result<Self> {
-        let cipher = Aes256Gcm::new_from_slice(encryption_key)
+    /// Creates a new service with the given 32‑byte encryption key.
+    pub fn new(key: &[u8; 32]) -> Result<Self> {
+        let cipher = Aes256Gcm::new_from_slice(key)
             .map_err(|_| CryptoError::InvalidKeyLength)?;
-
-        Ok(Self { cipher })
+        // Default Argon2 parameters (recommended) – cached for reuse.
+        let argon2 = Argon2::default();
+        Ok(Self { cipher, argon2 })
     }
 
-    /// Encrypts plaintext into a base64-encoded string (Nonce + Ciphertext)
-    /// Purely CPU-bound and fast: Kept synchronous to avoid async executor overhead.
+    // ---------- Synchronous fast operations ----------
+
+    #[inline]
+    pub fn sha_hash(&self, data: &str) -> Result<String> {
+        let mut hasher = Sha256::new();
+        hasher.update(data.as_bytes());
+        let hash = hasher.finalize();
+        // Encode directly to hex without extra allocations.
+        let mut hex = String::with_capacity(64);
+        hex.encode_hex(&hash); // uses the `hex` crate's `ToHex` impl
+        Ok(hex)
+    }
+
+    #[inline]
+    pub fn verify_sha_hash(&self, data: &str, hash: &str) -> Result<bool> {
+        let computed = self.sha_hash(data)?;
+        // Constant‑time comparison is not needed for SHA (used for integrity, not secrets)
+        Ok(computed == hash)
+    }
+
+    #[inline]
     pub fn encrypt_text(&self, text: &str) -> Result<String> {
         let mut nonce_bytes = [0u8; 12];
-        rand::rng().fill_bytes(&mut nonce_bytes);
+        rand::rng().fill(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
 
-        // Encrypt the data
-        let ciphertext = self
-            .cipher
-            .encrypt(nonce, text.as_bytes())
+        let ciphertext = self.cipher.encrypt(nonce, text.as_bytes())
             .map_err(|_| CryptoError::EncryptionFailed)?;
 
-        // Pre-allocate exact capacity to prevent reallocation vectors
         let mut combined = Vec::with_capacity(12 + ciphertext.len());
         combined.extend_from_slice(&nonce_bytes);
         combined.extend_from_slice(&ciphertext);
-        let encrypt_text = general_purpose::STANDARD.encode(combined);
-        Ok(encrypt_text)
+        Ok(general_purpose::STANDARD.encode(combined))
     }
 
-    /// Decrypts a base64-encoded string back to plaintext
-    /// Purely CPU-bound and fast: Kept synchronous.
+    #[inline]
     pub fn decrypt_text(&self, encrypted_text: &str) -> Result<String> {
         let decoded = general_purpose::STANDARD.decode(encrypted_text)?;
-
         if decoded.len() < 12 {
             return Err(CryptoError::InvalidDataLength);
         }
-
         let (nonce_bytes, ciphertext) = decoded.split_at(12);
         let nonce = Nonce::from_slice(nonce_bytes);
 
-        // Decrypt the data
-        let plaintext = self
-            .cipher
-            .decrypt(nonce, ciphertext)
+        let plaintext = self.cipher.decrypt(nonce, ciphertext)
             .map_err(|_| CryptoError::DecryptionFailed)?;
-    let decrypt_text = String::from_utf8(plaintext)?;
-        Ok(decrypt_text)
+        Ok(String::from_utf8(plaintext)?)
     }
 
-    /// Hashes a string using SHA-256 and returns a hex-encoded string.
-    /// Fast, non-blocking: Kept synchronous.
-    pub fn sha256_hash(&self, data: &str) -> Result<String> {
-        let mut hasher = Sha256::new();
-        hasher.update(data.as_bytes());
-        let result = hasher.finalize();
+    // ---------- Asynchronous heavy operations ----------
 
-        // Format raw bytes directly into a 64-character lowercase hex string
-        let hash = format!("{:x}", result);
-
-        Ok(hash)
-    }
-
-    /// Hashes a string using Argon2.
-    /// Heavy CPU/Memory usage: Must remain async and run on a blocking thread pool.
-    pub async fn hash_data(&self, data: &str) -> Result<String> {
+    pub async fn argon2_hash(&self, data: &str) -> Result<String> {
         let data = data.to_string();
+        let argon2 = self.argon2.clone(); // cheap clone
 
-        let hash = task::spawn_blocking(move || -> Result<String> {
+        task::spawn_blocking(move || -> Result<String> {
             let salt = SaltString::generate(&mut OsRng);
-            let argon2 = Argon2::default();
-
-            let hashed = argon2
-                .hash_password(data.as_bytes(), &salt)?; // `?` cleanly converts to CryptoError::Argon2
-            
+            let hashed = argon2.hash_password(data.as_bytes(), &salt)?;
             Ok(hashed.to_string())
         })
-        .await??;
-
-        Ok(hash)
+        .await?
     }
 
-    /// Verifies a string against an Argon2 hash.
-    /// Heavy CPU usage: Must remain async and run on a blocking thread pool.
-    pub async fn verify_hash(&self, data: &str, hash: &str) -> Result<bool> {
+    pub async fn verify_argon2_hash(&self, data: &str, hash: &str) -> Result<bool> {
         let data = data.to_string();
         let hash = hash.to_string();
+        let argon2 = self.argon2.clone();
 
-        let is_valid = task::spawn_blocking(move || {
+        task::spawn_blocking(move || -> bool {
             match PasswordHash::new(&hash) {
-                Ok(parsed) => Argon2::default()
-                    .verify_password(data.as_bytes(), &parsed)
-                    .is_ok(),
+                Ok(parsed) => argon2.verify_password(data.as_bytes(), &parsed).is_ok(),
                 Err(_) => false,
             }
         })
-        .await?;
-
-        Ok(is_valid)
+        .await
+        .map_err(Into::into)
     }
+
+    // ---------- File operations (async) ----------
+
+    pub async fn sha_file_hash(&self, path: &str) -> Result<String> {
+        let path = path.to_string();
+        task::spawn_blocking(move || -> Result<String> {
+            let file = std::fs::File::open(&path)?;
+            let mut reader = BufReader::new(file);
+            let mut hasher = Sha256::new();
+            let mut buffer = [0; 8192];
+            loop {
+                let n = reader.read(&mut buffer)?;
+                if n == 0 { break; }
+                hasher.update(&buffer[..n]);
+            }
+            let hash = hasher.finalize();
+            let mut hex = String::with_capacity(64);
+            hex.encode_hex(&hash);
+            Ok(hex)
+        })
+        .await?
+    }
+
+    pub async fn verify_sha_file_hash(&self, path: &str, hash: &str) -> Result<bool> {
+        let computed = self.sha_file_hash(path).await?;
+        Ok(computed == hash)
+    }
+
+    pub async fn argon2_file_hash(&self, path: &str) -> Result<String> {
+        // Reads whole file (bad for huge files, but Argon2 is not meant for large data anyway)
+        let content = tokio::fs::read(path).await?;
+        let data = String::from_utf8(content)?;
+        self.argon2_hash(&data).await
+    }
+
+    pub async fn verify_argon2_file_hash(&self, path: &str, hash: &str) -> Result<bool> {
+        let content = tokio::fs::read(path).await?;
+        let data = String::from_utf8(content)?;
+        self.verify_argon2_hash(&data, hash).await
+    }
+
+    pub async fn encrypt_file(&self, path: &str) -> Result<String> {
+        // Read file, encrypt, write to new file with ".enc" extension.
+        let content = tokio::fs::read(path).await?;
+        let text = String::from_utf8(content)?;
+        let encrypted = self.encrypt_text(&text)?;
+        let new_path = format!("{}.enc", path);
+        tokio::fs::write(&new_path, encrypted.as_bytes()).await?;
+        Ok(new_path)
+    }
+
+    pub async fn decrypt_file(&self, path: &str) -> Result<String> {
+        let content = tokio::fs::read_to_string(path).await?;
+        let decrypted = self.decrypt_text(&content)?;
+        let new_path = path.trim_end_matches(".enc").to_string();
+        tokio::fs::write(&new_path, decrypted.as_bytes()).await?;
+        Ok(new_path)
+    }
+}
+
+// ========== Macro ==========
+
+#[macro_export]
+macro_rules! crypto_service {
+    ($key:expr) => {{
+        // $key must be of type [u8; 32]
+        $crate::CryptoService::new(&$key).expect("Invalid key length")
+    }};
 }

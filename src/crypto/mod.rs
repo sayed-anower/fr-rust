@@ -1,2 +1,5 @@
 pub mod crypto;
-pub use crypto::CryptoService;
+pub use crypto::{
+  CryptoService,
+  CryptoError
+};
