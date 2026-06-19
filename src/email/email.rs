@@ -12,9 +12,7 @@ use std::time::Duration;
 use thiserror::Error;
 use tokio::time::timeout;
 
-// ============================================================================
 // Error Type
-// ============================================================================
 
 #[derive(Debug, Error)]
 pub enum EmailError {
@@ -31,9 +29,7 @@ pub enum EmailError {
     Timeout,
 }
 
-// ============================================================================
 // Configuration
-// ============================================================================
 
 #[derive(Clone)]
 pub struct EmailConfig {
@@ -44,11 +40,11 @@ pub struct EmailConfig {
     pub from_name: String,
     pub from_email: String,
     pub timeout_secs: u64,
-    pub pool_max_size: u32, // Changed from usize to u32
+    pub pool_max_size: u32,
 }
 
 impl EmailConfig {
-    /// Example: load from environment
+    // Example: load from environment
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
         use std::env;
         Ok(Self {
@@ -68,9 +64,7 @@ impl EmailConfig {
     }
 }
 
-// ============================================================================
 // Email Service
-// ============================================================================
 
 #[derive(Clone)]
 pub struct EmailService {
@@ -80,7 +74,7 @@ pub struct EmailService {
 }
 
 impl EmailService {
-    /// Create production-ready email service with connection pooling
+    // Create production-ready email service with connection pooling
     pub fn new(config: EmailConfig) -> Result<Self, EmailError> {
         // Converted the exposed secret reference to an owned String
         let creds = Credentials::new(
@@ -120,7 +114,7 @@ impl EmailService {
         })
     }
 
-    /// Send email
+    // Send email
     pub async fn send_email(&self, data: EmailData) -> Result<(), EmailError> {
         let email = Message::builder()
             .from(self.from.clone()) // Clone the lightweight Mailbox directly
@@ -137,23 +131,10 @@ impl EmailService {
     }
 }
 
-// ============================================================================
-// Email Data (Performance optimized)
-// ============================================================================
-
+// Email Data
 #[derive(Debug)]
 pub struct EmailData {
     pub to: Mailbox,           
     pub subject: String,
     pub body: String,
-}
-
-impl EmailData {
-    pub fn new(to: &str, subject: String, body: String) -> Result<Self, EmailError> {
-        Ok(Self {
-            to: to.parse()?,
-            subject,
-            body,
-        })
-    }
 }

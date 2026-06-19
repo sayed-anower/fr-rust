@@ -17,8 +17,8 @@ pub mod res;
 // The Framework Prelude
 pub mod prelude {
     // Internal Library Re-exports
-    pub use crate::crypto::{self, CryptoService};
-    pub use crate::db::{self, DbPool};
+    pub use crate::crypto::{self, CryptoService, CryptoError};
+    pub use crate::db::{self, DbPool, DbError};
     pub use crate::ddos::{self, DdosConfig, DdosShield};
     pub use crate::email::{self, EmailConfig, EmailData, EmailService};
     pub use crate::jwt::{self, JwtService};
@@ -26,10 +26,10 @@ pub mod prelude {
     pub use crate::otp::{self, OtpConfig, OtpService};
     pub use crate::redis::{self, RedisManager, RedisManagerError};
     pub use crate::server::{self, env, env_or_default, load_env};
-    pub use crate::types::{self, FileRlt, Main, Rlt, RltRsp, Rsp, Rqs};
+    pub use crate::types::{self, Main, Http};
     pub use crate::ws::{self, UserMsg, WsConfig, WsManager};
     pub use crate::{
-        err, get, post, put, delete, patch, head, options, scope, resource, run_server, setup_jwt
+        err, get, post, put, delete, patch, head, options, scope, resource, run_server, setup_jwt, crypto_service
     };
     pub use crate::res::{
           self,
