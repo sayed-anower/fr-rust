@@ -26,7 +26,7 @@ pub mod prelude {
     pub use crate::otp::{self, OtpConfig, OtpService};
     pub use crate::redis::{self, RedisManager, RedisManagerError};
     pub use crate::server::{self, env, env_or_default, load_env};
-    pub use crate::types::{self, Main, Http};
+    pub use crate::types::{self, Main, Http, ResError};
     pub use crate::ws::{self, UserMsg, WsConfig, WsManager, MsgBatcher};
     pub use crate::{
         err, cfg, route, get, post, put, delete, patch, head, options, scope, resource, run

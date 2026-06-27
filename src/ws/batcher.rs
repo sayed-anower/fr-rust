@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio::time::{interval, Duration};
-use tokio_postgres::{Client, NoTls, Error as PgError};
-use deadpool_postgres::{Pool, Config, Manager, RecyclingMethod, Runtime};
+use tokio_postgres::{NoTls, Error as PgError};
+use deadpool_postgres::{Pool, Config, ManagerConfig, RecyclingMethod, Runtime};
 use std::sync::Arc;
 use std::collections::VecDeque;
-use bytes::Bytes;
 use thiserror::Error;
+use futures_util::SinkExt; // Required for copy_writer.send()
 
 #[derive(Error, Debug)]
 pub enum BatcherError {
@@ -14,6 +14,8 @@ pub enum BatcherError {
     Pg(#[from] PgError),
     #[error("Pool error: {0}")]
     Pool(#[from] deadpool_postgres::PoolError),
+    #[error("Pool creation error: {0}")]
+    CreatePool(#[from] deadpool_postgres::CreatePoolError),
     #[error("Serialization error: {0}")]
     Serialization(#[from] bincode::Error),
     #[error("IO error: {0}")]
@@ -43,11 +45,16 @@ impl MsgBatcher {
     pub async fn new(database_url: &str) -> Result<Self> {
         let mut cfg = Config::new();
         cfg.url = Some(database_url.to_string());
+        
+        // Correctly assign recycling_method to ManagerConfig
+        cfg.manager = Some(ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
+        });
+
+        // Use standard initialization to avoid missing QueueMode types
         cfg.pool = Some(deadpool_postgres::PoolConfig {
             max_size: 16,
-            timeouts: deadpool_postgres::Timeouts::default(),
-            queue_mode: deadpool_postgres::QueueMode::Fifo,
-            recycling_method: RecyclingMethod::Fast,
+            ..Default::default()
         });
         
         let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls)?;
@@ -157,7 +164,6 @@ impl MsgBatcher {
                 }
                 
                 // Drain in chunks for efficiency
-                let total_len = guard.len();
                 let batches: Vec<Vec<Message>> = guard
                     .drain(..)
                     .collect::<Vec<Message>>()
@@ -205,16 +211,27 @@ impl MsgBatcher {
         let mut batch_buffer = String::with_capacity(messages.len() * 256);
         
         for msg in &messages {
-            // Escape CSV fields properly
-            let escaped_content = msg.content.replace('"', "\"\"");
-            batch_buffer.push_str(&format!(
-                "{},{},\"{}\"\n",
-                msg.time, msg.id, escaped_content
-            ));
+            batch_buffer.push_str(&msg.time.to_string());
+            batch_buffer.push(',');
+            batch_buffer.push_str(&msg.id);
+            batch_buffer.push_str(",\"");
+            
+            // Allocation-free CSV escaping
+            for c in msg.content.chars() {
+                if c == '"' {
+                    batch_buffer.push_str("\"\"");
+                } else {
+                    batch_buffer.push(c);
+                }
+            }
+            batch_buffer.push_str("\"\n");
         }
         
-        copy_writer.send(&batch_buffer.into_bytes()).await?;
-        copy_writer.finish().await?;
+        // Efficiently pass the allocated string to the Sink
+        copy_writer.send(bytes::Bytes::from(batch_buffer)).await?;
+        
+        // Correctly pin the writer to call finish()
+        std::pin::pin!(copy_writer).finish().await?;
         
         Ok(())
     }
@@ -231,12 +248,3 @@ impl MsgBatcher {
         self.buffer.lock().await.len()
     }
 }
-
-// Drop implementation for graceful shutdown
-impl Drop for MsgBatcher {
-    fn drop(&mut self) {
-        // Note: tokio runtime must be running for this to work
-        // Better to call shutdown() explicitly
-    }
-}
-
