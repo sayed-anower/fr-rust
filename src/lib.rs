@@ -27,9 +27,9 @@ pub mod prelude {
     pub use crate::redis::{self, RedisManager, RedisManagerError};
     pub use crate::server::{self, env, env_or_default, load_env};
     pub use crate::types::{self, Main, Http};
-    pub use crate::ws::{self, UserMsg, WsConfig, WsManager};
+    pub use crate::ws::{self, UserMsg, WsConfig, WsManager, MsgBatcher};
     pub use crate::{
-        err, get, post, put, delete, patch, head, options, scope, resource, run_server
+        err, cfg, route, get, post, put, delete, patch, head, options, scope, resource, run
     };
     pub use crate::res::{
           self,
@@ -60,4 +60,5 @@ pub mod prelude {
           upload_streaming
     };
     pub use actix_web::main as web_main;
+    pub use actix_web::web::ServiceConfig as Config;
 }

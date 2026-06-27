@@ -1,5 +1,5 @@
 #[macro_export]
-macro_rules! run_server {
+macro_rules! run {
     (
         state: $state:expr,
         config: $config:expr,

@@ -1,72 +1,98 @@
+// First, define a macro for creating routes with service
+#[macro_export]
+macro_rules! route {
+    // Basic route without extras
+    ($method:ident, $path:literal, $handler:expr) => {
+        ::actix_web::web::$method().to($handler)
+    };
+    // Route with extras (guard, middleware, etc.)
+    ($method:ident, $path:literal, $handler:expr, $($extra:tt)*) => {
+        ::actix_web::web::$method().to($handler).$($extra)*
+    };
+}
+
+// Now define individual method macros that use route!
 #[macro_export]
 macro_rules! get {
-    // Basic
     ($path:literal, $handler:expr) => {
-        $crate::cfg.route($path, ::actix_web::web::get().to($handler))
+        $crate::route!(get, $path, $handler)
     };
-    // With extra chaining (guard, middleware, etc.)
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::get().to($handler).$($extra)*)
+        $crate::route!(get, $path, $handler, $($extra)*)
     };
 }
 
 #[macro_export]
 macro_rules! post {
     ($path:literal, $handler:expr) => {
-        $crate::cfg.route($path, ::actix_web::web::post().to($handler))
+        $crate::route!(post, $path, $handler)
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::post().to($handler).$($extra)*)
+        $crate::route!(post, $path, $handler, $($extra)*)
     };
 }
 
 #[macro_export]
 macro_rules! put {
     ($path:literal, $handler:expr) => {
-        $crate::cfg.route($path, ::actix_web::web::put().to($handler))
+        $crate::route!(put, $path, $handler)
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::put().to($handler).$($extra)*)
+        $crate::route!(put, $path, $handler, $($extra)*)
     };
 }
 
 #[macro_export]
 macro_rules! delete {
     ($path:literal, $handler:expr) => {
-        $crate::cfg.route($path, ::actix_web::web::delete().to($handler))
+        $crate::route!(delete, $path, $handler)
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::delete().to($handler).$($extra)*)
+        $crate::route!(delete, $path, $handler, $($extra)*)
     };
 }
 
 #[macro_export]
 macro_rules! patch {
     ($path:literal, $handler:expr) => {
-        $crate::cfg.route($path, ::actix_web::web::patch().to($handler))
+        $crate::route!(patch, $path, $handler)
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::patch().to($handler).$($extra)*)
+        $crate::route!(patch, $path, $handler, $($extra)*)
     };
 }
 
 #[macro_export]
 macro_rules! head {
     ($path:literal, $handler:expr) => {
-        $crate::cfg.route($path, ::actix_web::web::head().to($handler))
+        $crate::route!(head, $path, $handler)
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::head().to($handler).$($extra)*)
+        $crate::route!(head, $path, $handler, $($extra)*)
     };
 }
 
 #[macro_export]
 macro_rules! options {
     ($path:literal, $handler:expr) => {
-        $crate::cfg.route($path, ::actix_web::web::options().to($handler))
+        $crate::route!(options, $path, $handler)
     };
     ($path:literal, $handler:expr, $($extra:tt)*) => {
-        $crate::cfg.route($path, ::actix_web::web::options().to($handler).$($extra)*)
+        $crate::route!(options, $path, $handler, $($extra)*)
+    };
+}
+
+// Finally, the cfg macro that uses service()
+#[macro_export]
+macro_rules! cfg {
+    // Single route
+    ($route:expr) => {
+        $crate::cfg.service($route)
+    };
+    // Multiple routes
+    ($($route:expr),* $(,)?) => {
+        $crate::cfg
+            $(.service($route))*
     };
 }
 
