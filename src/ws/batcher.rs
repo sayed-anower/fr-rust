@@ -205,7 +205,10 @@ impl MsgBatcher {
         
         // Use COPY for maximum performance
         let copy_stmt = "COPY messages (time, user_id, content) FROM STDIN (FORMAT CSV, DELIMITER ',')";
-        let mut copy_writer = client.copy_in(copy_stmt).await?;
+        let copy_writer = client.copy_in(copy_stmt).await?;
+        
+        // Pin the writer immediately so SinkExt methods can safely be called on it
+        tokio::pin!(copy_writer);
         
         // Pre-allocate buffer for performance
         let mut batch_buffer = String::with_capacity(messages.len() * 256);
@@ -227,11 +230,9 @@ impl MsgBatcher {
             batch_buffer.push_str("\"\n");
         }
         
-        // Efficiently pass the allocated string to the Sink
-        copy_writer.send(bytes::Bytes::from(batch_buffer)).await?;
-        
-        // Correctly pin the writer to call finish()
-        std::pin::pin!(copy_writer).finish().await?;
+        // Now `.send()` works flawlessly because `copy_writer` is pinned to the stack
+        copy_writer.as_mut().send(bytes::Bytes::from(batch_buffer)).await?;
+        copy_writer.finish().await?;
         
         Ok(())
     }

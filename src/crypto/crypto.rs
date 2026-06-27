@@ -151,7 +151,7 @@ impl CryptoService {
                 hasher.update(&buffer[..n]);
             }
             let hash = hasher.finalize();
-            let mut hex = String::with_capacity(64);
+    
             let hex_string: String = hash.encode_hex();
             Ok(hex_string)
         })
