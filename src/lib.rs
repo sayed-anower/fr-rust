@@ -29,7 +29,7 @@ pub mod prelude {
     pub use crate::types::{self, Main, Http, ResError};
     pub use crate::ws::{self, UserMsg, WsConfig, WsManager, MsgBatcher};
     pub use crate::{
-        err, cfg, route, routes, get, post, put, delete, patch, head, scope, resource, run
+        err, route, routes, get, post, put, delete, patch, scope, resource, run
     };
     pub use crate::res::{
           self,
