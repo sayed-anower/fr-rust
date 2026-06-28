@@ -4,7 +4,6 @@ use deadpool_redis::redis::AsyncCommands;
 use deadpool_redis::redis::Client;
 use thiserror::Error;
 
-/// Custom error type for Redis operations
 #[derive(Error, Debug)]
 pub enum RedisManagerError {
     #[error("Failed to create Redis pool: {0}")]
@@ -17,24 +16,21 @@ pub enum RedisManagerError {
     Redis(#[from] redis::RedisError),
 }
 
-/// A specialized Result type for convenience
 pub type Result<T> = std::result::Result<T, RedisManagerError>;
 
 #[derive(Clone)]
 pub struct RedisManager {
-    url: String,
     pool: Pool,
+    client: Client, 
 }
 
 impl RedisManager {
     pub fn new(url: &str) -> Result<Self> {
         let cfg = Config::from_url(url);
         let pool = cfg.create_pool(Some(Runtime::Tokio1))?;
+        let client = Client::open(url)?;
 
-        Ok(RedisManager { 
-            url: url.to_string(), 
-            pool 
-        })
+        Ok(RedisManager { pool, client })
     }
 
     pub async fn get_connection(&self) -> Result<Connection> {
@@ -43,16 +39,13 @@ impl RedisManager {
     }
 
     pub async fn publish(&self, event_name: &str, content: &str) -> Result<()> {
-        let mut conn = self.pool.get().await?;
-
+        let mut conn = self.get_connection().await?; 
         conn.publish::<_, _, ()>(event_name, content).await?;
         Ok(())
     }
 
     pub async fn subscribe(&self, event_name: &str) -> Result<redis::aio::PubSubStream> {
-        let client = Client::open(self.url.as_str())?;
-        let mut pubsub = client.get_async_pubsub().await?;
-
+        let mut pubsub = self.client.get_async_pubsub().await?;
         pubsub.subscribe(event_name).await?;
 
         Ok(pubsub.into_on_message())

@@ -6,10 +6,14 @@ pub fn load_env() {
     dotenv().ok();
 }
 // Get var or default
-pub fn env_or_default(name: &str, default_value: &str) -> String {
-    env::var(name).unwrap_or_else(|_| default_value.to_string())
+pub fn env_or_default(name: &str, default_value: &str) -> &str {
+    env::var(name)
+    .as_str()
+    .unwrap_or_else(|_| default_value)
 }
 // Get var
-pub fn env(name: &str) -> String {
-    env::var(name).expect(&format!("Failed to load {}", name))
+pub fn env(name: &str) -> &str {
+    env::var(name)
+    .as_str()
+    .expect(&format!("Failed to load {}", name))
 }

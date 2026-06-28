@@ -1,39 +1,53 @@
 #[macro_export]
 macro_rules! run {
     (
-        state: $state:expr,
-        config: $config:expr,
+        // addr is mandatory, the rest are wrapped in $(...)? to make them optional
         addr: $addr:expr
-        $(, app: { $($app_extra:tt)* })?          // Extra stuff after App::new()
-        $(, server: { $($server_extra:tt)* })?    // Extra stuff after .bind()
-        $(,)?                                      // Optional trailing comma
+        $(, state: $state:expr )?
+        $(, config: $config:expr )?
+        $(, configure_app: |$app:ident| $app_body:expr )?
+        $(, configure_server: |$server:ident| $server_body:expr )?
+        $(,)? // Handles an optional trailing comma at the very end of the macro call
     ) => {{
         use actix_web::{web, App, HttpServer};
-        use actix_web::middleware::{Compress, NormalizePath, TrailingSlash};
         use std::net::SocketAddr;
 
         let bind_addr: SocketAddr = $addr.parse()
             .expect("Invalid socket address format");
 
-        log::info!("Starting server on {}", bind_addr);
-
-        HttpServer::new(move || {
+        let mut server = HttpServer::new(move || {
             let mut app = App::new()
-                .app_data(web::Data::new($state.clone()))
-                // === Security & Performance Middleware (always included) ===
-                .wrap(NormalizePath::new(TrailingSlash::Trim))
-                .wrap(Compress::default());
-            // User can add more middleware / services / app_data here
+                .wrap(actix_web::middleware::NormalizePath::new(actix_web::middleware::TrailingSlash::Trim))
+                .wrap(actix_web::middleware::Compress::default());
+            
+            // Evaluated at compile-time: Only included if state is passed
             $(
-                app = app $($app_extra)*;
+                app = app.app_data(web::Data::new($state.clone()));
             )?
-            app.configure($config)
+
+            // Evaluated at compile-time: Only included if configure_app is passed
+            $(
+                let mut $app = app;
+                $app = $app_body;
+                app = $app;
+            )?
+
+            // Evaluated at compile-time: Only fallback to standard config if passed
+            $(
+                app = app.configure($config);
+            )?
+
+            app
         })
-        .bind(bind_addr)?
+        .bind(bind_addr)?;
+
+        // Evaluated at compile-time: Only included if configure_server is passed
         $(
-            .$($server_extra)*
+            let mut $server = server;
+            $server = $server_body;
+            server = $server;
         )?
-        .run()
-        .await
+
+        server.run().await
     }};
 }
