@@ -65,8 +65,6 @@ impl CryptoService {
         let mut hasher = Sha256::new();
         hasher.update(data.as_bytes());
         let hash = hasher.finalize();
-        // Encode directly to hex without extra allocations.
-        let mut hex = String::with_capacity(64);
         let hex_string: String = hash.encode_hex();
         Ok(hex_string)
     }
