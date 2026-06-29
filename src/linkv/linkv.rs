@@ -57,7 +57,7 @@ impl LinkV {
             if !self.config.jwt.verify_token(token) {
                 return Err(LinkVError::InvalidToken);
             } else {
-                return Ok(false);
+                return Ok(true);
             }
         }
 }
